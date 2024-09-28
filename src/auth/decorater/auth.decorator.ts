@@ -8,7 +8,7 @@ export interface JwtUser {
 }
 
 // requst를 잡아서 jwt user 부분만 return
-export const User = createParamDecorator<JwtUser>(
+export const AuthUser = createParamDecorator<JwtUser>(
   (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
     return request.user;

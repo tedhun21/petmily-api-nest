@@ -1,14 +1,15 @@
-import { UserRole } from '../entity/user.entity';
+import { PickType } from '@nestjs/mapped-types';
+import { User, UserRole } from '../entity/user.entity';
 
-export class CreateUserInput {
-  username: string;
-  nickname: string;
-  email: string;
-  password: string;
-  phone: string;
-  address: string;
-  detailAddress: string;
-  role: UserRole;
-}
+export class CreateUserInput extends PickType(User, [
+  'username',
+  'nickname',
+  'email',
+  'password',
+  'phone',
+  'address',
+  'detailAddress',
+  'role',
+]) {}
 
 export class CreateUserOutput {}

@@ -7,15 +7,12 @@ import {
   Post,
   Put,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
-
 import { UsersService } from './users.service';
 import { CreateUserInput } from './dto/create.user.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
-import { Request } from 'express';
-import { JwtUser, User } from 'src/auth/decorater/auth.decorator';
+import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { UpdateUserInput } from './dto/update.user.dto';
 
 @Controller('users')
@@ -32,7 +29,7 @@ export class UsersController {
 
   @UseGuards(AuthGuard)
   @Get('me')
-  me(@User() jwtUser: JwtUser) {
+  me(@AuthUser() jwtUser: JwtUser) {
     return this.usersService.me(jwtUser);
   }
 
@@ -45,7 +42,7 @@ export class UsersController {
   @Put(':id')
   update(
     @Param() params: { id: string },
-    @User() jwtUser: JwtUser,
+    @AuthUser() jwtUser: JwtUser,
     @Body() updateUserInput: UpdateUserInput,
   ) {
     return this.usersService.update(params, jwtUser, updateUserInput);
@@ -53,7 +50,7 @@ export class UsersController {
 
   @UseGuards(AuthGuard)
   @Delete(':id')
-  delete(@Param() params: { id: string }, @User() jwtUser: JwtUser) {
+  delete(@Param() params: { id: string }, @AuthUser() jwtUser: JwtUser) {
     return this.usersService.delete(params, jwtUser);
   }
 }

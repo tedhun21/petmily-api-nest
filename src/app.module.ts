@@ -1,9 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, UploadedFile } from '@nestjs/common';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { User } from './users/entity/user.entity';
 import { AuthModule } from './auth/auth.module';
+import { PetsModule } from './pets/pets.module';
+import { Pet } from './pets/entity/pet.entity';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -18,11 +21,13 @@ import { AuthModule } from './auth/auth.module';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       logging: true,
-      entities: [User],
+      entities: [User, Pet],
       synchronize: true,
     }),
     UsersModule,
     AuthModule,
+    PetsModule,
+    UploadsModule,
   ],
   controllers: [],
   providers: [],

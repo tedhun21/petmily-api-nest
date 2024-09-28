@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 
@@ -21,42 +22,26 @@ export class UsersService {
   ) {}
 
   async create(createUserInput: CreateUserInput) {
-    const {
-      email,
-      password,
-      username,
-      nickname,
-      role,
-      address,
-      detailAddress,
-      phone,
-    } = createUserInput;
+    const { email } = createUserInput;
+
+    const exists = await this.usersRepository.findOne({ where: { email } });
+
+    if (exists) {
+      throw new ConflictException('This email is already registered.');
+    }
+    const user = this.usersRepository.create(createUserInput);
+
     try {
-      const exists = await this.usersRepository.findOne({ where: { email } });
-
-      if (exists) {
-        throw new ConflictException('This email is already registered.');
-      }
-
-      const newUser = await this.usersRepository.save(
-        this.usersRepository.create({
-          email,
-          password,
-          username,
-          nickname,
-          role,
-          address,
-          detailAddress,
-          phone,
-        }),
-      );
+      const newUser = await this.usersRepository.save(user);
 
       return {
         id: newUser.id,
         message: 'Successfully create a user.',
       };
     } catch (e) {
-      throw new BadRequestException('Fail to create a user.');
+      throw new InternalServerErrorException(
+        'Failed to create a user. Please try again later.',
+      );
     }
   }
 
@@ -66,7 +51,7 @@ export class UsersService {
     const user = await this.usersRepository.findOne({ where: { id: +id } });
 
     if (!user) {
-      throw new NotFoundException();
+      throw new NotFoundException('No user found.');
     }
 
     return user;
@@ -76,7 +61,7 @@ export class UsersService {
     const user = await this.usersRepository.findOne({ where: { email } });
 
     if (!user) {
-      throw new NotFoundException();
+      throw new NotFoundException('No user found.');
     }
     return user;
   }
@@ -86,7 +71,7 @@ export class UsersService {
     const me = await this.usersRepository.findOne({ where: { id, email } });
 
     if (!me) {
-      throw new NotFoundException();
+      throw new NotFoundException('No user found.');
     }
 
     return me;
@@ -106,7 +91,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException();
+      throw new NotFoundException('No user found.');
     }
 
     if (password) {
@@ -118,9 +103,7 @@ export class UsersService {
       ...updateData,
     };
 
-    const updatedUser = await this.usersRepository.save(
-      this.usersRepository.create(updateUserData),
-    );
+    const updatedUser = await this.usersRepository.save(updateUserData);
 
     return { id: updatedUser.id, message: 'Successfully update the user.' };
   }
@@ -130,21 +113,23 @@ export class UsersService {
     const { id: userId } = jwtUser;
 
     if (+id !== userId) {
-      throw new ForbiddenException();
+      throw new ForbiddenException(
+        'You do not have permission to delete this user.',
+      );
     }
 
     const user = await this.usersRepository.findOneBy({ id: userId });
 
     if (!user) {
-      throw new NotFoundException();
+      throw new NotFoundException('No user found.');
     }
 
-    const deletedUser = await this.usersRepository.remove(user);
+    try {
+      await this.usersRepository.remove(user);
 
-    if (!deletedUser) {
-      throw new BadRequestException('Fail to delete the user.');
+      return { id: +userId, message: 'Successfully delete the user.' };
+    } catch (e) {
+      throw new InternalServerErrorException('Fail to delete the user.');
     }
-
-    return { id: user.id, message: 'Successfully delete the user.' };
   }
 }
