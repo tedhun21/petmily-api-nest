@@ -11,7 +11,7 @@ import { UploadsService } from './uploads.service';
 
 @Controller('uploads')
 export class UploadsController {
-  constructor(private uploadService: UploadsService) {}
+  constructor(private readonly uploadService: UploadsService) {}
   @Post()
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: 3 * 1024 * 1024 } }),

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -18,7 +17,7 @@ import { UpdateUserInput } from './dto/update.user.dto';
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    private readonly usersRepository: Repository<User>,
   ) {}
 
   async create(createUserInput: CreateUserInput) {
@@ -83,7 +82,9 @@ export class UsersService {
     const { password, ...updateData } = updateUserInput;
 
     if (+id !== userId) {
-      throw new ForbiddenException();
+      throw new ForbiddenException(
+        'You do not have permission to update this user.',
+      );
     }
 
     const user = await this.usersRepository.findOne({

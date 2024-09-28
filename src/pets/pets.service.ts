@@ -17,8 +17,8 @@ import { UpdatePetInput } from './dto/update.pet.dto';
 export class PetsService {
   constructor(
     @InjectRepository(Pet)
-    private petsRepository: Repository<Pet>,
-    private uploadsService: UploadsService,
+    private readonly petsRepository: Repository<Pet>,
+    private readonly uploadsService: UploadsService,
   ) {}
 
   async create(
@@ -30,15 +30,8 @@ export class PetsService {
 
     let photoUrl = null;
 
-    // TODO: 파일이 있으면 업로드 후 URL을 받음
     if (file) {
       photoUrl = await this.uploadsService.uploadFile(file);
-
-      if (!photoUrl) {
-        throw new InternalServerErrorException(
-          'Fail to upload image. Please try again later.',
-        );
-      }
     }
 
     // Pet 엔티티 생성
@@ -59,7 +52,7 @@ export class PetsService {
     }
   }
 
-  async getPets(pagination: PaginationInput) {
+  async find(pagination: PaginationInput) {
     const { page, pageSize } = pagination;
 
     try {
@@ -68,7 +61,7 @@ export class PetsService {
         skip: (page - 1) * pageSize,
       });
 
-      if (pets.length === 0) {
+      if (total === 0) {
         throw new NotFoundException('No pets found.');
       }
 
@@ -89,7 +82,7 @@ export class PetsService {
     }
   }
 
-  async getPet(params: { id: string }) {
+  async findOne(params: { id: string }) {
     const { id } = params;
 
     try {

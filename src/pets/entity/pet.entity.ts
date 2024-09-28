@@ -1,7 +1,8 @@
 import { IsEnum, IsString, Length, Max, Min } from 'class-validator';
 import { CoreEntity } from 'src/common/entity/core.entity';
+import { Reservation } from 'src/reservations/entity/reservation.entity';
 import { User } from 'src/users/entity/user.entity';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, ManyToMany, ManyToOne } from 'typeorm';
 
 export enum PetSpecies {
   Dog = 'Dog',
@@ -43,4 +44,7 @@ export class Pet extends CoreEntity {
 
   @ManyToOne(() => User, (user) => user.pets)
   owner: User;
+
+  @ManyToMany(() => Reservation, (reservation) => reservation.pets)
+  reservations: Reservation[];
 }

@@ -20,7 +20,7 @@ import { PaginationInput } from 'src/common/dto/pagination.dto';
 
 @Controller('pets')
 export class PetsController {
-  constructor(private petsService: PetsService) {}
+  constructor(private readonly petsService: PetsService) {}
   @UseGuards(AuthGuard)
   @Post()
   @UseInterceptors(FileInterceptor('file'))
@@ -34,13 +34,13 @@ export class PetsController {
   }
 
   @Get()
-  getPets(@Query() pagination: PaginationInput) {
-    return this.petsService.getPets(pagination);
+  find(@Query() pagination: PaginationInput) {
+    return this.petsService.find(pagination);
   }
 
   @Get(':id')
-  getPet(@Param() params: { id: string }) {
-    return this.petsService.getPet(params);
+  findOne(@Param() params: { id: string }) {
+    return this.petsService.findOne(params);
   }
 
   @UseGuards(AuthGuard)

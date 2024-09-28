@@ -10,6 +10,7 @@ import {
   Length,
 } from 'class-validator';
 import { Pet } from 'src/pets/entity/pet.entity';
+import { Reservation } from 'src/reservations/entity/reservation.entity';
 
 export enum UserRole {
   Client = 'Client',
@@ -56,6 +57,14 @@ export class User extends CoreEntity {
 
   @OneToMany(() => Pet, (pet) => pet.owner)
   pets: Pet[];
+
+  // 클라이언트로서 예약한 경우
+  @OneToMany(() => Reservation, (reservation) => reservation.client)
+  clientReservations: Reservation[];
+
+  // 펫시터로서 예약받은 경우
+  @OneToMany(() => Reservation, (reservation) => reservation.petsitter)
+  petsitterReservations: Reservation[];
 
   @BeforeInsert()
   @BeforeUpdate()

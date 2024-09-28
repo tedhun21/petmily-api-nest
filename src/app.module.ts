@@ -7,6 +7,8 @@ import { AuthModule } from './auth/auth.module';
 import { PetsModule } from './pets/pets.module';
 import { Pet } from './pets/entity/pet.entity';
 import { UploadsModule } from './uploads/uploads.module';
+import { ReservationsModule } from './reservations/reservations.module';
+import { Reservation } from './reservations/entity/reservation.entity';
 
 @Module({
   imports: [
@@ -21,13 +23,14 @@ import { UploadsModule } from './uploads/uploads.module';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       logging: true,
-      entities: [User, Pet],
+      entities: [User, Pet, Reservation],
       synchronize: true,
     }),
     UsersModule,
     AuthModule,
     PetsModule,
     UploadsModule,
+    ReservationsModule,
   ],
   controllers: [],
   providers: [],

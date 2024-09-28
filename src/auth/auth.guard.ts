@@ -14,7 +14,7 @@ import { Reflector } from '@nestjs/core';
 export class AuthGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    private jwtService: JwtService,
+    private readonly jwtService: JwtService,
   ) {}
   // 1. 클라이언트에서 header로 jwt보냈다.
   // 2. 여기서는 request를 잡아서 header에 있는 jwt를 확인한다.

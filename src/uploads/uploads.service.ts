@@ -11,7 +11,7 @@ import {
 
 @Injectable()
 export class UploadsService {
-  private storage: any;
+  private readonly storage: any;
 
   constructor() {
     const firebaseConfig = {
