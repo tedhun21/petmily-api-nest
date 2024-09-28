@@ -51,6 +51,7 @@ export class ReservationsService {
         pets: petIds.map((id) => ({ id })),
       });
 
+      console.log(reservation);
       const createdReservation =
         await this.reservationsRepository.save(reservation);
 
@@ -64,13 +65,20 @@ export class ReservationsService {
   }
 
   async find(jwtUser: JwtUser, pagination: PaginationInput) {
-    const { id: userId } = jwtUser;
+    const { id: userId, role } = jwtUser;
     const { page, pageSize } = pagination;
+
+    const whereCondition =
+      role === 'Client'
+        ? { client: { id: userId } }
+        : role === 'Petsitter' && {
+            petsitter: { id: userId },
+          };
 
     try {
       const [reservations, total] =
         await this.reservationsRepository.findAndCount({
-          where: { client: { id: userId } },
+          where: whereCondition,
           take: pageSize,
           skip: (page - 1) * pageSize,
         });
@@ -90,7 +98,7 @@ export class ReservationsService {
     }
   }
 
-  async findOne(jwtUser: JwtUser, params: { id: string }) {
+  async findOne(jwtUser: JwtUser, params: { id: string | number }) {
     const { id: userId } = jwtUser;
     const { id: reservationId } = params;
 

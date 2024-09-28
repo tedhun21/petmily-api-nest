@@ -66,8 +66,8 @@ export class UsersService {
   }
 
   async me(jwtUser: JwtUser) {
-    const { id, email } = jwtUser;
-    const me = await this.usersRepository.findOne({ where: { id, email } });
+    const { id: userId } = jwtUser;
+    const me = await this.usersRepository.findOne({ where: { id: userId } });
 
     if (!me) {
       throw new NotFoundException('No user found.');
@@ -78,7 +78,7 @@ export class UsersService {
 
   async update(params, jwtUser: JwtUser, updateUserInput: UpdateUserInput) {
     const { id } = params;
-    const { id: userId, email } = jwtUser;
+    const { id: userId } = jwtUser;
     const { password, ...updateData } = updateUserInput;
 
     if (+id !== userId) {

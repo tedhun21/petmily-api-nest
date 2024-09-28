@@ -1,4 +1,4 @@
-import { Module, UploadedFile } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
@@ -9,6 +9,8 @@ import { Pet } from './pets/entity/pet.entity';
 import { UploadsModule } from './uploads/uploads.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { Reservation } from './reservations/entity/reservation.entity';
+import { JournalsModule } from './journals/journals.module';
+import { Journal } from './journals/entity/journal.entity';
 
 @Module({
   imports: [
@@ -23,7 +25,7 @@ import { Reservation } from './reservations/entity/reservation.entity';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       logging: true,
-      entities: [User, Pet, Reservation],
+      entities: [User, Pet, Reservation, Journal],
       synchronize: true,
     }),
     UsersModule,
@@ -31,6 +33,7 @@ import { Reservation } from './reservations/entity/reservation.entity';
     PetsModule,
     UploadsModule,
     ReservationsModule,
+    JournalsModule,
   ],
   controllers: [],
   providers: [],

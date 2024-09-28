@@ -1,8 +1,9 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { UserRole } from 'src/users/entity/user.entity';
 
 export interface JwtUser {
   id: number;
-  email: string;
+  role: UserRole;
   iat: number;
   exp: number;
 }

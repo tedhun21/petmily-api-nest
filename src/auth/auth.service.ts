@@ -1,5 +1,4 @@
 import {
-  ExecutionContext,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -31,7 +30,7 @@ export class AuthService {
       throw new UnauthorizedException("Don't match password");
     }
 
-    const payload = { id: user.id, email: user.email };
+    const payload = { id: user.id, role: user.role };
     return {
       access_token: await this.jwtService.signAsync(payload),
     };

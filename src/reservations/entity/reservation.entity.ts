@@ -1,9 +1,18 @@
 import { Type } from 'class-transformer';
 import { IsDate, IsEnum, IsString } from 'class-validator';
 import { CoreEntity } from 'src/common/entity/core.entity';
+import { Journal } from 'src/journals/entity/journal.entity';
 import { Pet } from 'src/pets/entity/pet.entity';
 import { User } from 'src/users/entity/user.entity';
-import { Column, Entity, JoinTable, ManyToMany, ManyToOne } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  JoinTable,
+  ManyToMany,
+  ManyToOne,
+  OneToOne,
+} from 'typeorm';
 
 export enum Status {
   Pending = 'Pending',
@@ -46,4 +55,11 @@ export class Reservation extends CoreEntity {
   @ManyToMany(() => Pet, (pet) => pet.reservations, { eager: true })
   @JoinTable()
   pets: Pet[];
+
+  @OneToOne(() => Journal, (journal) => journal.reservation, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn()
+  journal: Journal;
 }

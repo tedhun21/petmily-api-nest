@@ -41,7 +41,6 @@ export class UploadsService {
 
       return downloadURL;
     } catch (e) {
-      console.log(e);
       throw new InternalServerErrorException('Fail to upload file.');
     }
   }

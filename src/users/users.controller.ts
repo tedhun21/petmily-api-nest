@@ -23,7 +23,7 @@ export class UsersController {
     return this.usersService.create(createUserInput);
   }
   @Get()
-  findByEmail(@Query('email') email) {
+  findByEmail(@Query('email') email: string) {
     return this.usersService.findByEmail(email);
   }
 
