@@ -1,8 +1,17 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import { CoreEntity } from 'src/common/entity/core.entity';
-import { BeforeInsert, BeforeUpdate, Column, Entity, OneToMany } from 'typeorm';
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  JoinTable,
+  ManyToMany,
+  OneToMany,
+} from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsPhoneNumber,
@@ -15,6 +24,21 @@ import { Reservation } from 'src/reservations/entity/reservation.entity';
 export enum UserRole {
   Client = 'Client',
   Petsitter = 'Petsitter',
+}
+
+export enum DayOfWeek {
+  Mon = 'Mon',
+  Tue = 'Tue',
+  Wed = 'Wed',
+  Thu = 'Thu',
+  Fri = 'Fri',
+  Sat = 'Sat',
+  Sun = 'Sun',
+}
+
+export enum PetType {
+  Cat = 'Cat',
+  Dog = 'Dog',
 }
 
 @Entity()
@@ -55,16 +79,53 @@ export class User extends CoreEntity {
   @IsPhoneNumber('KR')
   phone: string;
 
+  @Column({ nullable: true })
+  @IsString()
+  photo?: string;
+
+  @Column('enum', { array: true, enum: PetType, nullable: true })
+  @IsArray()
+  @IsEnum(PetType)
+  possiblePetTypes: PetType[];
+
+  @Column('enum', { array: true, enum: DayOfWeek, nullable: true })
+  @IsArray()
+  @IsEnum(DayOfWeek, { each: true })
+  possibleDays: DayOfWeek[];
+
+  @Column('text', { array: true, nullable: true })
+  @IsArray()
+  @IsString({ each: true })
+  possibleLocations: string[];
+
+  @Column({ type: 'time', nullable: true })
+  @IsString()
+  possibleStartTime: string;
+
+  @Column({ type: 'time', nullable: true })
+  @IsString()
+  possibleEndTime: string;
+
+  // 가지고 있는 펫 (for client)
   @OneToMany(() => Pet, (pet) => pet.owner)
   pets: Pet[];
 
-  // 클라이언트로서 예약한 경우
+  // 클라이언트로서 예약한 경우 (for client)
   @OneToMany(() => Reservation, (reservation) => reservation.client)
   clientReservations: Reservation[];
 
-  // 펫시터로서 예약받은 경우
+  // 펫시터로서 예약받은 경우 (for petsitter)
   @OneToMany(() => Reservation, (reservation) => reservation.petsitter)
   petsitterReservations: Reservation[];
+
+  // 좋아요 표시  for client
+  @ManyToMany(() => User)
+  @JoinTable({
+    name: 'favorites', // 관계 테이블 이름
+    joinColumn: { name: 'clientId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'petsitterId', referencedColumnName: 'id' },
+  })
+  favorites: User[];
 
   @BeforeInsert()
   @BeforeUpdate()

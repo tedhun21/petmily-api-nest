@@ -1,3 +1,3 @@
 export class ParamInput {
-  id: string;
+  id: string | number;
 }

@@ -8,12 +8,14 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { CreateReservationInput } from './dto/create-reservation.dto';
+import { CreateReservationInput } from './dto/create.reservation.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { ReservationsService } from './reservations.service';
-import { UpdateReservationInput } from './dto/update-reservation.dto';
+import { UpdateReservationInput } from './dto/update.reservation.dto';
 import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { ParamInput } from 'src/common/dto/param.dto';
+import { FindReservationsInput } from './dto/find.reservation.dto';
 
 @Controller('reservations')
 export class ReservationsController {
@@ -29,13 +31,16 @@ export class ReservationsController {
 
   @UseGuards(AuthGuard)
   @Get()
-  find(@AuthUser() jwtUser: JwtUser, @Query() pagination: PaginationInput) {
-    return this.reservationsService.find(jwtUser, pagination);
+  find(
+    @AuthUser() jwtUser: JwtUser,
+    @Query() findReservationsInput: FindReservationsInput,
+  ) {
+    return this.reservationsService.find(jwtUser, findReservationsInput);
   }
 
   @UseGuards(AuthGuard)
   @Get(':id')
-  findOne(@AuthUser() jwtUser: JwtUser, @Param() params: { id: string }) {
+  findOne(@AuthUser() jwtUser: JwtUser, @Param() params: ParamInput) {
     return this.reservationsService.findOne(jwtUser, params);
   }
 
@@ -43,7 +48,7 @@ export class ReservationsController {
   @Put(':id')
   update(
     @AuthUser() jwtUser: JwtUser,
-    @Param() params: { id: string },
+    @Param() params: ParamInput,
     @Body() updateReservationInput: UpdateReservationInput,
   ) {
     return this.reservationsService.update(

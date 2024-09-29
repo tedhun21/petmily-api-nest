@@ -13,10 +13,10 @@ import {
 import { AuthGuard } from 'src/auth/auth.guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { PaginationInput } from 'src/common/dto/pagination.dto';
-import { CreateReviewInput } from './dto/create-review.dto';
+import { CreateReviewInput } from './dto/create.review.dto';
 import { ReviewsService } from './reviews.service';
 import { ParamInput } from 'src/common/dto/param.dto';
-import { UpdateReviewInput } from './dto/update-review.dto';
+import { UpdateReviewInput } from './dto/update.review.dto';
 
 @Controller('reviews')
 export class ReviewsController {

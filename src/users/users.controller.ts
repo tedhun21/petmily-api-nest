@@ -14,6 +14,11 @@ import { CreateUserInput } from './dto/create.user.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { UpdateUserInput } from './dto/update.user.dto';
+import { ParamInput } from 'src/common/dto/param.dto';
+import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { FindPossiblePetsittersInput } from './dto/findPossible.petsitter.dto';
+import { FindReservationsInput } from 'src/reservations/dto/find.reservation.dto';
+import { Status } from 'src/reservations/entity/reservation.entity';
 
 @Controller('users')
 export class UsersController {
@@ -34,14 +39,14 @@ export class UsersController {
   }
 
   @Get(':id')
-  findById(@Param() params: { id: string }) {
+  findById(@Param() params: ParamInput) {
     return this.usersService.findById(params);
   }
 
   @UseGuards(AuthGuard)
   @Put(':id')
   update(
-    @Param() params: { id: string },
+    @Param() params: ParamInput,
     @AuthUser() jwtUser: JwtUser,
     @Body() updateUserInput: UpdateUserInput,
   ) {
@@ -50,7 +55,32 @@ export class UsersController {
 
   @UseGuards(AuthGuard)
   @Delete(':id')
-  delete(@Param() params: { id: string }, @AuthUser() jwtUser: JwtUser) {
+  delete(@Param() params: ParamInput, @AuthUser() jwtUser: JwtUser) {
     return this.usersService.delete(params, jwtUser);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('petsitters/favorite')
+  findFavoritePetsitters(
+    @AuthUser() jwtUser: JwtUser,
+    @Query() pagination: PaginationInput,
+  ) {
+    return this.usersService.findFavoritePetsitters(jwtUser, pagination);
+  }
+
+  @Get('petsitters/possible')
+  findPossiblePetsitters(
+    @Query() findPossiblePetsittersIput: FindPossiblePetsittersInput,
+  ) {
+    return this.usersService.findPossiblePetsitters(findPossiblePetsittersIput);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('petsitters/used')
+  findUsedPetsitters(
+    @AuthUser() jwtUser: JwtUser,
+    @Query() pagination: PaginationInput,
+  ) {
+    return this.usersService.findUsedPetsitters(jwtUser, pagination);
   }
 }

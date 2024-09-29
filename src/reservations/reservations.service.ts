@@ -5,13 +5,16 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateReservationInput } from './dto/create-reservation.dto';
+import { CreateReservationInput } from './dto/create.reservation.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { LessThan, MoreThan, Repository } from 'typeorm';
 import { Reservation } from './entity/reservation.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { UpdateReservationInput } from './dto/update-reservation.dto';
+import { UpdateReservationInput } from './dto/update.reservation.dto';
 import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { FindReservationsInput } from './dto/find.reservation.dto';
+import { UserRole } from 'src/users/entity/user.entity';
+import { ParamInput } from 'src/common/dto/param.dto';
 
 @Injectable()
 export class ReservationsService {
@@ -51,7 +54,6 @@ export class ReservationsService {
         pets: petIds.map((id) => ({ id })),
       });
 
-      console.log(reservation);
       const createdReservation =
         await this.reservationsRepository.save(reservation);
 
@@ -64,21 +66,42 @@ export class ReservationsService {
     }
   }
 
-  async find(jwtUser: JwtUser, pagination: PaginationInput) {
+  async find(jwtUser: JwtUser, findReservationsInput: FindReservationsInput) {
     const { id: userId, role } = jwtUser;
-    const { page, pageSize } = pagination;
+    const { status, page, pageSize } = findReservationsInput;
 
-    const whereCondition =
-      role === 'Client'
-        ? { client: { id: userId } }
-        : role === 'Petsitter' && {
-            petsitter: { id: userId },
-          };
+    let whereCondition = {} as any;
+
+    if (role) {
+      if (role === UserRole.Client) {
+        whereCondition.client = { id: userId };
+      } else if (role === UserRole.Petsitter) {
+        whereCondition.petsitter = { id: userId };
+      }
+    }
+
+    if (status) {
+      whereCondition.status = status;
+    }
 
     try {
       const [reservations, total] =
         await this.reservationsRepository.findAndCount({
           where: whereCondition,
+          relations: ['client', 'petsitter'],
+          select: {
+            client: { id: true, nickname: true, photo: true },
+            petsitter: {
+              id: true,
+              nickname: true,
+              photo: true,
+              possibleDays: true,
+              possibleLocations: true,
+              possiblePetTypes: true,
+              possibleStartTime: true,
+              possibleEndTime: true,
+            },
+          },
           take: +pageSize,
           skip: (+page - 1) * +pageSize,
         });
@@ -98,7 +121,7 @@ export class ReservationsService {
     }
   }
 
-  async findOne(jwtUser: JwtUser, params: { id: string | number }) {
+  async findOne(jwtUser: JwtUser, params: ParamInput) {
     const { id: userId } = jwtUser;
     const { id: reservationId } = params;
 
@@ -125,7 +148,7 @@ export class ReservationsService {
 
   async update(
     jwtUser: JwtUser,
-    params: { id: string },
+    params: ParamInput,
     updateReservationInput: UpdateReservationInput,
   ) {
     const { id: userId } = jwtUser;

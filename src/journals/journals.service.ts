@@ -7,12 +7,12 @@ import {
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { Journal } from './entity/journal.entity';
-import { CreateJournalInput } from './dto/create-journal.dto';
+import { CreateJournalInput } from './dto/create.journal.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { UploadsService } from 'src/uploads/uploads.service';
-import { UpdateJournalInput } from './dto/update-journal.dto';
+import { UpdateJournalInput } from './dto/update.journal.dto';
 import { PaginationInput } from 'src/common/dto/pagination.dto';
 
 @Injectable()

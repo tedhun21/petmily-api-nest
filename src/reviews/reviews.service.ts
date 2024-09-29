@@ -7,13 +7,13 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
-import { CreateReviewInput } from './dto/create-review.dto';
+import { CreateReviewInput } from './dto/create.review.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Review } from './entity/reivew.entity';
 import { Repository } from 'typeorm';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { ParamInput } from 'src/common/dto/param.dto';
-import { UpdateReviewInput } from './dto/update-review.dto';
+import { UpdateReviewInput } from './dto/update.review.dto';
 import { PaginationInput } from 'src/common/dto/pagination.dto';
 
 @Injectable()
