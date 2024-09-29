@@ -44,10 +44,10 @@ export class PetsService {
     try {
       const createdPet = await this.petsRepository.save(pet);
 
-      return { id: createdPet.id, message: 'Successfully registered a pet.' };
+      return { id: createdPet.id, message: 'Successfully registered a pet' };
     } catch (error) {
       throw new InternalServerErrorException(
-        'Fail to register pet. Please try again later.',
+        'Fail to register pet. Please try again later',
       );
     }
   }
@@ -57,15 +57,15 @@ export class PetsService {
 
     try {
       const [pets, total] = await this.petsRepository.findAndCount({
-        take: pageSize,
-        skip: (page - 1) * pageSize,
+        take: +pageSize,
+        skip: (+page - 1) * +pageSize,
       });
 
       if (total === 0) {
-        throw new NotFoundException('No pets found.');
+        throw new NotFoundException('No pets found');
       }
 
-      const totalPage = Math.ceil(total / pageSize);
+      const totalPage = Math.ceil(total / +pageSize);
 
       return {
         results: pets,
@@ -78,7 +78,7 @@ export class PetsService {
       };
     } catch (e) {
       console.error('Error fetching pets:', e);
-      throw new InternalServerErrorException('Fail to fetch pets.');
+      throw new InternalServerErrorException('Fail to fetch pets');
     }
   }
 
@@ -89,12 +89,12 @@ export class PetsService {
       const pet = await this.petsRepository.findOne({ where: { id: +id } }); // await 추가
 
       if (!pet) {
-        throw new NotFoundException('No pet found.');
+        throw new NotFoundException('No pet found');
       }
       return pet;
     } catch (e) {
       throw new InternalServerErrorException(
-        'Failed to fetch pet. Please try again later.',
+        'Failed to fetch pet. Please try again later',
       );
     }
   }
@@ -113,7 +113,7 @@ export class PetsService {
     });
 
     if (!pet) {
-      throw new NotFoundException('No pet found.');
+      throw new NotFoundException('No pet found');
     }
 
     let photoUrl = null;
@@ -134,11 +134,11 @@ export class PetsService {
     };
 
     try {
-      await this.petsRepository.save(updateData);
+      const updatedPet = await this.petsRepository.save(updateData);
 
-      return { id: petId, message: 'Successfully updated the pet.' };
+      return { id: updatedPet.id, message: 'Successfully updated the pet' };
     } catch (e) {
-      throw new InternalServerErrorException('Failed to update the pet.');
+      throw new InternalServerErrorException('Failed to update the pet');
     }
   }
 
@@ -153,21 +153,21 @@ export class PetsService {
     });
 
     if (!pet) {
-      throw new NotFoundException('No pet found.');
+      throw new NotFoundException('No pet found');
     }
 
     if (pet.owner.id !== userId) {
       throw new ForbiddenException(
-        'You do not have permission to delete this pet.',
+        'You do not have permission to delete this pet',
       );
     }
 
     try {
       await this.petsRepository.remove(pet);
 
-      return { id: +petId, message: 'Successfully delete the pet.' };
+      return { id: +petId, message: 'Successfully delete the pet' };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to delete pet.');
+      throw new InternalServerErrorException('Fail to delete pet');
     }
   }
 }

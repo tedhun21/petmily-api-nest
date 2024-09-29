@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -28,7 +29,7 @@ export class JournalsService {
     createJournalInput: CreateJournalInput,
     files: Array<Express.Multer.File>,
   ) {
-    const { id: userId } = jwtUser;
+    const { id: userId, role } = jwtUser;
 
     const { reservationId } = createJournalInput;
 
@@ -36,10 +37,14 @@ export class JournalsService {
       id: reservationId,
     });
 
-    if (reservation.petsitter.id !== userId) {
+    if (role !== 'Petsitter' || reservation.petsitter.id !== userId) {
       throw new ForbiddenException(
         "You don't have permission to create a journal.",
       );
+    }
+
+    if (reservation.journal) {
+      throw new ConflictException('Journal with reservation already exists');
     }
 
     let photoUrls = [];
@@ -60,9 +65,9 @@ export class JournalsService {
     try {
       const newJournal = await this.journalsRepository.save(journal);
 
-      return { id: newJournal.id, message: 'Successfully create a journal.' };
+      return { id: newJournal.id, message: 'Successfully create a journal' };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to create a journal.');
+      throw new InternalServerErrorException('Fail to create a journal');
     }
   }
 
@@ -80,18 +85,18 @@ export class JournalsService {
     try {
       const [journals, total] = await this.journalsRepository.findAndCount({
         where: whereCondition,
-        take: pageSize,
-        skip: (page - 1) * pageSize,
+        take: +pageSize,
+        skip: (+page - 1) * +pageSize,
       });
 
-      const totalPage = Math.ceil(total / pageSize);
+      const totalPage = Math.ceil(total / +pageSize);
 
       return {
         results: journals,
         pagination: { total, totalPage, page: +page, pageSize: +pageSize },
       };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to fetch the journals.');
+      throw new InternalServerErrorException('Fail to fetch the journals');
     }
   }
 
@@ -106,7 +111,7 @@ export class JournalsService {
       });
 
       if (!journal) {
-        throw new NotFoundException('Journal not found.');
+        throw new NotFoundException('Journal not found');
       }
 
       const { petsitter, client } = journal.reservation;
@@ -118,7 +123,7 @@ export class JournalsService {
 
       return journal;
     } catch (e) {
-      throw new InternalServerErrorException('Fail to fetch the journal.');
+      throw new InternalServerErrorException('Fail to fetch the journal');
     }
   }
 
@@ -138,7 +143,7 @@ export class JournalsService {
     });
 
     if (!journal) {
-      throw new NotFoundException('No journal found.');
+      throw new NotFoundException('No journal found');
     }
 
     if (journal.reservation.petsitter.id !== userId) {
@@ -171,11 +176,15 @@ export class JournalsService {
       body,
     };
     try {
-      await this.journalsRepository.save(updateJournalData);
+      const updatedJournal =
+        await this.journalsRepository.save(updateJournalData);
 
-      return { id: +journalId, message: 'Successfully update the journal.' };
+      return {
+        id: updatedJournal.id,
+        message: 'Successfully update the journal',
+      };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to update the journal.');
+      throw new InternalServerErrorException('Fail to update the journal');
     }
   }
 
@@ -189,7 +198,7 @@ export class JournalsService {
     });
 
     if (!journal) {
-      throw new NotFoundException('No journal found.');
+      throw new NotFoundException('No journal found');
     }
 
     const { petsitter, client } = journal.reservation;
@@ -210,9 +219,9 @@ export class JournalsService {
     try {
       await this.journalsRepository.remove(journal);
 
-      return { id: +journalId, message: 'Successfully delete the journal.' };
+      return { id: +journalId, message: 'Successfully delete the journal' };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to delete the journal.');
+      throw new InternalServerErrorException('Fail to delete the journal');
     }
   }
 }

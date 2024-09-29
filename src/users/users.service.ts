@@ -26,7 +26,7 @@ export class UsersService {
     const exists = await this.usersRepository.findOne({ where: { email } });
 
     if (exists) {
-      throw new ConflictException('This email is already registered.');
+      throw new ConflictException('This email is already registered');
     }
     const user = this.usersRepository.create(createUserInput);
 
@@ -35,11 +35,11 @@ export class UsersService {
 
       return {
         id: newUser.id,
-        message: 'Successfully create a user.',
+        message: 'Successfully create a user',
       };
     } catch (e) {
       throw new InternalServerErrorException(
-        'Failed to create a user. Please try again later.',
+        'Failed to create a user. Please try again later',
       );
     }
   }
@@ -50,7 +50,7 @@ export class UsersService {
     const user = await this.usersRepository.findOne({ where: { id: +id } });
 
     if (!user) {
-      throw new NotFoundException('No user found.');
+      throw new NotFoundException('No user found');
     }
 
     return user;
@@ -60,7 +60,7 @@ export class UsersService {
     const user = await this.usersRepository.findOne({ where: { email } });
 
     if (!user) {
-      throw new NotFoundException('No user found.');
+      throw new NotFoundException('No user found');
     }
     return user;
   }
@@ -70,7 +70,7 @@ export class UsersService {
     const me = await this.usersRepository.findOne({ where: { id: userId } });
 
     if (!me) {
-      throw new NotFoundException('No user found.');
+      throw new NotFoundException('No user found');
     }
 
     return me;
@@ -83,7 +83,7 @@ export class UsersService {
 
     if (+id !== userId) {
       throw new ForbiddenException(
-        'You do not have permission to update this user.',
+        'You do not have permission to update this user',
       );
     }
 
@@ -92,7 +92,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('No user found.');
+      throw new NotFoundException('No user found');
     }
 
     if (password) {
@@ -106,7 +106,7 @@ export class UsersService {
 
     const updatedUser = await this.usersRepository.save(updateUserData);
 
-    return { id: updatedUser.id, message: 'Successfully update the user.' };
+    return { id: updatedUser.id, message: 'Successfully update the user' };
   }
 
   async delete(params: { id: string }, jwtUser: JwtUser) {
@@ -115,22 +115,22 @@ export class UsersService {
 
     if (+id !== userId) {
       throw new ForbiddenException(
-        'You do not have permission to delete this user.',
+        'You do not have permission to delete this user',
       );
     }
 
     const user = await this.usersRepository.findOneBy({ id: userId });
 
     if (!user) {
-      throw new NotFoundException('No user found.');
+      throw new NotFoundException('No user found');
     }
 
     try {
       await this.usersRepository.remove(user);
 
-      return { id: +userId, message: 'Successfully delete the user.' };
+      return { id: +userId, message: 'Successfully delete the user' };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to delete the user.');
+      throw new InternalServerErrorException('Fail to delete the user');
     }
   }
 }

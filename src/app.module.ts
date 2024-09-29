@@ -11,6 +11,8 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { Reservation } from './reservations/entity/reservation.entity';
 import { JournalsModule } from './journals/journals.module';
 import { Journal } from './journals/entity/journal.entity';
+import { ReviewsModule } from './reviews/reviews.module';
+import { Review } from './reviews/entity/reivew.entity';
 
 @Module({
   imports: [
@@ -25,7 +27,7 @@ import { Journal } from './journals/entity/journal.entity';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       logging: true,
-      entities: [User, Pet, Reservation, Journal],
+      entities: [User, Pet, Reservation, Journal, Review],
       synchronize: true,
     }),
     UsersModule,
@@ -34,6 +36,7 @@ import { Journal } from './journals/entity/journal.entity';
     UploadsModule,
     ReservationsModule,
     JournalsModule,
+    ReviewsModule,
   ],
   controllers: [],
   providers: [],

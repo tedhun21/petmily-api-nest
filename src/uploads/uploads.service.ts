@@ -41,7 +41,7 @@ export class UploadsService {
 
       return downloadURL;
     } catch (e) {
-      throw new InternalServerErrorException('Fail to upload file.');
+      throw new InternalServerErrorException('Fail to upload file');
     }
   }
 
@@ -56,7 +56,7 @@ export class UploadsService {
       await deleteObject(imageRef);
       return true;
     } catch (e) {
-      throw new InternalServerErrorException('Fail to delete file.');
+      throw new InternalServerErrorException('Fail to delete file');
     }
   }
 }

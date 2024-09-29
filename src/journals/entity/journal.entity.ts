@@ -16,6 +16,7 @@ export class Journal extends CoreEntity {
 
   @OneToOne(() => Reservation, (reservation) => reservation.journal, {
     nullable: true,
+    onDelete: 'SET NULL',
   })
   reservation: Reservation;
 }

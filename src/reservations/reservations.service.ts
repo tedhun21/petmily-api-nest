@@ -39,7 +39,7 @@ export class ReservationsService {
 
     if (existingReservation) {
       throw new ConflictException(
-        'Reservation already exists for the selected time.',
+        'Reservation already exists for the selected time',
       );
     }
 
@@ -57,10 +57,10 @@ export class ReservationsService {
 
       return {
         id: createdReservation.id,
-        message: 'Successfully create a reservation.',
+        message: 'Successfully create a reservation',
       };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to create a reservation.');
+      throw new InternalServerErrorException('Fail to create a reservation');
     }
   }
 
@@ -79,22 +79,22 @@ export class ReservationsService {
       const [reservations, total] =
         await this.reservationsRepository.findAndCount({
           where: whereCondition,
-          take: pageSize,
-          skip: (page - 1) * pageSize,
+          take: +pageSize,
+          skip: (+page - 1) * +pageSize,
         });
 
       if (total === 0) {
-        throw new NotFoundException('No pets found.');
+        throw new NotFoundException('No pets found');
       }
 
-      const totalPage = Math.ceil(total / pageSize);
+      const totalPage = Math.ceil(total / +pageSize);
 
       return {
         results: reservations,
         pagination: { total, totalPage, page: +page, pageSize: +pageSize },
       };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to fetch reservations.');
+      throw new InternalServerErrorException('Fail to fetch reservations');
     }
   }
 
@@ -104,11 +104,11 @@ export class ReservationsService {
 
     const reservation = await this.reservationsRepository.findOne({
       where: { id: +reservationId },
-      relations: ['client', 'petsitter'],
+      relations: ['client', 'petsitter', 'journal', 'review'],
     });
 
     if (!reservation) {
-      throw new NotFoundException('No reservation found.');
+      throw new NotFoundException('No reservation found');
     }
 
     if (
@@ -116,7 +116,7 @@ export class ReservationsService {
       reservation.petsitter.id !== userId
     ) {
       throw new ForbiddenException(
-        'You do not have permission to fetch this reservation.',
+        'You do not have permission to fetch this reservation',
       );
     }
 
@@ -137,7 +137,7 @@ export class ReservationsService {
     });
 
     if (!reservation) {
-      throw new NotFoundException('No reservation found.');
+      throw new NotFoundException('No reservation found');
     }
 
     if (
@@ -149,20 +149,22 @@ export class ReservationsService {
       );
     }
 
-    try {
-      const updateReservationData = {
-        ...reservation,
-        ...updateReservationInput,
-      };
+    const updateReservationData = {
+      ...reservation,
+      ...updateReservationInput,
+    };
 
-      await this.reservationsRepository.save(updateReservationData);
+    try {
+      const updatedReservation = await this.reservationsRepository.save(
+        updateReservationData,
+      );
 
       return {
-        id: +reservationId,
-        message: 'Successfully update the reservation.',
+        id: updatedReservation.id,
+        message: 'Successfully update the reservation',
       };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to update the reservation.');
+      throw new InternalServerErrorException('Fail to update the reservation');
     }
   }
 }
