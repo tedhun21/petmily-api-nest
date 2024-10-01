@@ -50,10 +50,7 @@ export class JournalsService {
     let photoUrls = [];
     if (files && files.length > 0) {
       photoUrls = await Promise.all(
-        files.map(async (file) => {
-          const photoUrl = await this.uploadsService.uploadFile(file);
-          return photoUrl;
-        }),
+        files.map(async (file) => await this.uploadsService.uploadFile(file)),
       );
     }
     const journal = this.journalsRepository.create({
@@ -154,8 +151,8 @@ export class JournalsService {
 
     if (deleteFiles && deleteFiles.length > 0) {
       await Promise.all(
-        deleteFiles.map((file) =>
-          this.uploadsService.deleteFile({ url: file }),
+        deleteFiles.map(
+          async (file) => await this.uploadsService.deleteFile({ url: file }),
         ),
       );
       journal.photos = journal.photos.filter(
@@ -163,7 +160,7 @@ export class JournalsService {
       );
     }
 
-    let newPhotoUrls: string[] = [];
+    let newPhotoUrls = null;
     if (files && files.length > 0) {
       newPhotoUrls = await Promise.all(
         files.map(async (file) => await this.uploadsService.uploadFile(file)),

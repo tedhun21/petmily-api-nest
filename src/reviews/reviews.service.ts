@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -10,11 +11,12 @@ import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { CreateReviewInput } from './dto/create.review.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Review } from './entity/reivew.entity';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { ParamInput } from 'src/common/dto/param.dto';
 import { UpdateReviewInput } from './dto/update.review.dto';
-import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { FindReviewsInput } from './dto/find.review.dto';
+import { UploadsService } from 'src/uploads/uploads.service';
 
 @Injectable()
 export class ReviewsService {
@@ -22,8 +24,13 @@ export class ReviewsService {
     @InjectRepository(Review)
     private readonly reviewsRepository: Repository<Review>,
     private readonly reservationsService: ReservationsService,
+    private readonly uploadsService: UploadsService,
   ) {}
-  async create(jwtUser: JwtUser, createReviewInput: CreateReviewInput) {
+  async create(
+    jwtUser: JwtUser,
+    createReviewInput: CreateReviewInput,
+    files: Array<Express.Multer.File>,
+  ) {
     const { id: userId, role } = jwtUser;
     const { reservationId } = createReviewInput;
 
@@ -33,6 +40,10 @@ export class ReviewsService {
 
     if (!reservation) {
       throw new NotFoundException('No reservation found');
+    }
+
+    if (reservation.review) {
+      throw new ConflictException('Review already exists for this reservation');
     }
 
     if (role !== 'Client' || reservation.client.id !== userId) {
@@ -47,9 +58,17 @@ export class ReviewsService {
       );
     }
 
+    let photoUrls = null;
+    if (files && files.length > 0) {
+      photoUrls = await Promise.all(
+        files.map(async (file) => await this.uploadsService.uploadFile(file)),
+      );
+    }
+
     const review = this.reviewsRepository.create({
       ...createReviewInput,
       reservation: { id: reservationId },
+      ...(photoUrls.length && { photos: photoUrls }),
     });
 
     try {
@@ -61,11 +80,25 @@ export class ReviewsService {
     }
   }
 
-  async find(pagination: PaginationInput) {
-    const { page, pageSize } = pagination;
+  async find(findReviewsInput: FindReviewsInput) {
+    const { photo, page, pageSize } = findReviewsInput;
+
+    let whereCondition = {} as any;
+    if (photo === 'true') {
+      whereCondition.photos = Not(IsNull());
+    }
 
     try {
       const [reviews, total] = await this.reviewsRepository.findAndCount({
+        where: whereCondition,
+        order: { createdAt: 'desc' },
+        relations: ['reservation.client'],
+        select: {
+          reservation: {
+            id: true,
+            client: { id: true, nickname: true, photo: true },
+          },
+        },
         take: +pageSize,
         skip: (+page - 1) * +pageSize,
       });
@@ -103,9 +136,11 @@ export class ReviewsService {
     jwtUser: JwtUser,
     params: ParamInput,
     updateReviewInput: UpdateReviewInput,
+    files: Array<Express.Multer.File>,
   ) {
     const { id: userId, role } = jwtUser;
     const { id: reviewId } = params;
+    const { deleteFiles, body } = updateReviewInput;
 
     const review = await this.reviewsRepository.findOne({
       where: { id: +reviewId },
@@ -123,6 +158,27 @@ export class ReviewsService {
       );
     }
 
+    if (deleteFiles && deleteFiles.length > 0) {
+      await Promise.all(
+        deleteFiles.map(
+          async (file) => await this.uploadsService.deleteFile({ url: file }),
+        ),
+      );
+
+      review.photos = review.photos.filter(
+        (url: string) => !deleteFiles.includes(url),
+      );
+    }
+
+    let newPhotoUrls = null;
+    if (files && files.length > 0) {
+      newPhotoUrls = await Promise.all(
+        files.map(async (file) => await this.uploadsService.uploadFile(file)),
+      );
+    }
+
+    review.photos = [...review.photos, ...newPhotoUrls];
+
     const updateReviewData = {
       ...review,
       ...updateReviewInput,
@@ -135,9 +191,9 @@ export class ReviewsService {
         id: updatedReview.id,
         message: 'Successfully update the review',
       };
-    } catch (e) {}
-
-    console.log(review);
+    } catch (e) {
+      throw new InternalServerErrorException('Fail to update the review');
+    }
   }
 
   async delete(jwtUser: JwtUser, params: ParamInput) {

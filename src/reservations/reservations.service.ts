@@ -7,11 +7,10 @@ import {
 } from '@nestjs/common';
 import { CreateReservationInput } from './dto/create.reservation.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
-import { LessThan, MoreThan, Repository } from 'typeorm';
-import { Reservation } from './entity/reservation.entity';
+import { In, LessThan, MoreThan, Repository } from 'typeorm';
+import { Reservation, Status } from './entity/reservation.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UpdateReservationInput } from './dto/update.reservation.dto';
-import { PaginationInput } from 'src/common/dto/pagination.dto';
 import { FindReservationsInput } from './dto/find.reservation.dto';
 import { UserRole } from 'src/users/entity/user.entity';
 import { ParamInput } from 'src/common/dto/param.dto';
@@ -68,9 +67,10 @@ export class ReservationsService {
 
   async find(jwtUser: JwtUser, findReservationsInput: FindReservationsInput) {
     const { id: userId, role } = jwtUser;
-    const { status, page, pageSize } = findReservationsInput;
+    const { order, status, page, pageSize } = findReservationsInput;
 
     let whereCondition = {} as any;
+    let orderCondition = {} as any;
 
     if (role) {
       if (role === UserRole.Client) {
@@ -80,14 +80,38 @@ export class ReservationsService {
       }
     }
 
+    if (order) {
+      switch (order) {
+        case 'asc':
+          orderCondition.createdAt = 'asc';
+          break;
+        case 'desc':
+          orderCondition.createdAt = 'desc';
+          break;
+      }
+    }
+
     if (status) {
-      whereCondition.status = status;
+      switch (status) {
+        case 'expected':
+          whereCondition.status = In([Status.Pending, Status.Accepted]); // 대기중 및 진행중 상태
+          break;
+        case 'done':
+          whereCondition.status = In([Status.Canceled, Status.Completed]); // 취소 및 완료 상태
+          break;
+        case 'all':
+          break;
+        default:
+          whereCondition.status = status;
+          break;
+      }
     }
 
     try {
       const [reservations, total] =
         await this.reservationsRepository.findAndCount({
           where: whereCondition,
+          order: orderCondition,
           relations: ['client', 'petsitter'],
           select: {
             client: { id: true, nickname: true, photo: true },
@@ -97,7 +121,7 @@ export class ReservationsService {
               photo: true,
               possibleDays: true,
               possibleLocations: true,
-              possiblePetTypes: true,
+              possiblePetSpecies: true,
               possibleStartTime: true,
               possibleEndTime: true,
             },
@@ -105,10 +129,6 @@ export class ReservationsService {
           take: +pageSize,
           skip: (+page - 1) * +pageSize,
         });
-
-      if (total === 0) {
-        throw new NotFoundException('No pets found');
-      }
 
       const totalPage = Math.ceil(total / +pageSize);
 
@@ -128,6 +148,20 @@ export class ReservationsService {
     const reservation = await this.reservationsRepository.findOne({
       where: { id: +reservationId },
       relations: ['client', 'petsitter', 'journal', 'review'],
+      select: {
+        client: { id: true, username: true, nickname: true, photo: true },
+        petsitter: {
+          id: true,
+          username: true,
+          nickname: true,
+          photo: true,
+          possibleDays: true,
+          possibleLocations: true,
+          possiblePetSpecies: true,
+          possibleStartTime: true,
+          possibleEndTime: true,
+        },
+      },
     });
 
     if (!reservation) {

@@ -33,9 +33,10 @@ export class PetsController {
     return this.petsService.create(jwtUser, parsedCreatePetInput, file);
   }
 
+  @UseGuards(AuthGuard)
   @Get()
-  find(@Query() pagination: PaginationInput) {
-    return this.petsService.find(pagination);
+  find(@AuthUser() jwtUser: JwtUser, @Query() pagination: PaginationInput) {
+    return this.petsService.find(jwtUser.id, pagination);
   }
 
   @Get(':id')

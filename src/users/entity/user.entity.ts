@@ -18,7 +18,7 @@ import {
   IsString,
   Length,
 } from 'class-validator';
-import { Pet } from 'src/pets/entity/pet.entity';
+import { Pet, Species } from 'src/pets/entity/pet.entity';
 import { Reservation } from 'src/reservations/entity/reservation.entity';
 
 export enum UserRole {
@@ -34,11 +34,6 @@ export enum DayOfWeek {
   Fri = 'Fri',
   Sat = 'Sat',
   Sun = 'Sun',
-}
-
-export enum PetType {
-  Cat = 'Cat',
-  Dog = 'Dog',
 }
 
 @Entity()
@@ -83,10 +78,14 @@ export class User extends CoreEntity {
   @IsString()
   photo?: string;
 
-  @Column('enum', { array: true, enum: PetType, nullable: true })
+  @Column({ nullable: true })
+  @IsString()
+  body?: string;
+
+  @Column('enum', { array: true, enum: Species, nullable: true })
   @IsArray()
-  @IsEnum(PetType)
-  possiblePetTypes: PetType[];
+  @IsEnum(Species)
+  possiblePetSpecies: Species[];
 
   @Column('enum', { array: true, enum: DayOfWeek, nullable: true })
   @IsArray()

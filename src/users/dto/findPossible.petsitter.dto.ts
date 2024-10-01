@@ -5,5 +5,5 @@ export class FindPossiblePetsittersInput extends PaginationInput {
   startTime: string;
   endTime: string;
   address: string;
-  petType: string[];
+  petSpecies: string;
 }

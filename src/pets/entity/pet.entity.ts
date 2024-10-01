@@ -1,10 +1,15 @@
-import { IsEnum, IsString, Length, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsString, Length, Max, Min } from 'class-validator';
 import { CoreEntity } from 'src/common/entity/core.entity';
 import { Reservation } from 'src/reservations/entity/reservation.entity';
 import { User } from 'src/users/entity/user.entity';
 import { Column, Entity, ManyToMany, ManyToOne } from 'typeorm';
 
-export enum PetSpecies {
+export enum Gender {
+  Male = 'Male',
+  Female = 'Female',
+}
+
+export enum Species {
   Dog = 'Dog',
   Cat = 'Cat',
 }
@@ -16,9 +21,13 @@ export class Pet extends CoreEntity {
   @Length(2, 50)
   name: string;
 
-  @Column({ type: 'enum', enum: PetSpecies })
-  @IsEnum(PetSpecies)
-  species: PetSpecies;
+  @Column({ type: 'enum', enum: Gender })
+  @IsEnum(Gender)
+  gender: Gender;
+
+  @Column({ type: 'enum', enum: Species })
+  @IsEnum(Species)
+  species: Species;
 
   @Column()
   @IsString()
@@ -33,6 +42,10 @@ export class Pet extends CoreEntity {
   @Min(0.1)
   @Max(50)
   weight: number;
+
+  @Column()
+  @IsBoolean()
+  neutering: boolean;
 
   @Column({ nullable: true })
   @IsString()

@@ -13,7 +13,6 @@ import { AuthGuard } from 'src/auth/auth.guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { ReservationsService } from './reservations.service';
 import { UpdateReservationInput } from './dto/update.reservation.dto';
-import { PaginationInput } from 'src/common/dto/pagination.dto';
 import { ParamInput } from 'src/common/dto/param.dto';
 import { FindReservationsInput } from './dto/find.reservation.dto';
 

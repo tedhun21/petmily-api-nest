@@ -52,18 +52,15 @@ export class PetsService {
     }
   }
 
-  async find(pagination: PaginationInput) {
+  async find(userId: number, pagination: PaginationInput) {
     const { page, pageSize } = pagination;
 
     try {
       const [pets, total] = await this.petsRepository.findAndCount({
+        where: { owner: { id: userId } },
         take: +pageSize,
         skip: (+page - 1) * +pageSize,
       });
-
-      if (total === 0) {
-        throw new NotFoundException('No pets found');
-      }
 
       const totalPage = Math.ceil(total / +pageSize);
 
@@ -77,7 +74,6 @@ export class PetsService {
         },
       };
     } catch (e) {
-      console.error('Error fetching pets:', e);
       throw new InternalServerErrorException('Fail to fetch pets');
     }
   }

@@ -7,7 +7,9 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserInput } from './dto/create.user.dto';
@@ -17,8 +19,7 @@ import { UpdateUserInput } from './dto/update.user.dto';
 import { ParamInput } from 'src/common/dto/param.dto';
 import { PaginationInput } from 'src/common/dto/pagination.dto';
 import { FindPossiblePetsittersInput } from './dto/findPossible.petsitter.dto';
-import { FindReservationsInput } from 'src/reservations/dto/find.reservation.dto';
-import { Status } from 'src/reservations/entity/reservation.entity';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('users')
 export class UsersController {
@@ -45,12 +46,20 @@ export class UsersController {
 
   @UseGuards(AuthGuard)
   @Put(':id')
+  @UseInterceptors(FileInterceptor('file'))
   update(
     @Param() params: ParamInput,
     @AuthUser() jwtUser: JwtUser,
-    @Body() updateUserInput: UpdateUserInput,
+    @Body('data') updateUserInput: string,
+    @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.usersService.update(params, jwtUser, updateUserInput);
+    const parsedUpdateUserInput: UpdateUserInput = JSON.parse(updateUserInput);
+    return this.usersService.update(
+      params,
+      jwtUser,
+      parsedUpdateUserInput,
+      file,
+    );
   }
 
   @UseGuards(AuthGuard)
@@ -82,5 +91,20 @@ export class UsersController {
     @Query() pagination: PaginationInput,
   ) {
     return this.usersService.findUsedPetsitters(jwtUser, pagination);
+  }
+
+  @Get('petsitters/star')
+  findStarPetsitters() {
+    console.log('star');
+  }
+
+  @Get('petsitters/review')
+  findReviewPetsitters() {
+    console.log('review');
+  }
+
+  @Get('petsitters/new')
+  findNewPetsitters() {
+    console.log('new');
   }
 }
