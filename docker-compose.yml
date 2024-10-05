@@ -1,0 +1,10 @@
+services:
+  app:
+    build:
+      context: . # Dockerfile이 위치한 디렉토리
+      dockerfile: Dockerfile # Dockerfile 이름
+    ports:
+      - '8080:8080' # 컨테이너의 8080 포트를 로컬의 8080 포트에 매핑
+    env_file:
+      - '.env.prod' # .env.prod 파일에서 환경 변수 가져오기
+  #   environment:

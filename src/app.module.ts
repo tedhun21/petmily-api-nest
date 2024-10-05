@@ -17,7 +17,8 @@ import { Review } from './reviews/entity/reivew.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      envFilePath: '.env',
+      isGlobal: true,
+      envFilePath: `.env.${process.env.NODE_ENV}`,
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
@@ -28,7 +29,7 @@ import { Review } from './reviews/entity/reivew.entity';
       database: process.env.DB_NAME,
       logging: true,
       entities: [User, Pet, Reservation, Journal, Review],
-      synchronize: true,
+      synchronize: false,
     }),
     UsersModule,
     AuthModule,

@@ -9,11 +9,11 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe());
 
   app.enableCors({
-    origin: ['http://localhost:3000'], // 허용할 여러 도메인
+    origin: ['http://localhost:3000', 'https://petmily.vercel.app'], // 허용할 여러 도메인
   });
 
   app.setGlobalPrefix('api');
 
-  await app.listen(1337);
+  await app.listen(8080);
 }
 bootstrap();

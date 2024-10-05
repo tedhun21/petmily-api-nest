@@ -61,7 +61,10 @@ export class UsersService {
   async findById(params: ParamInput) {
     const { id } = params;
 
-    const user = await this.usersRepository.findOne({ where: { id: +id } });
+    const user = await this.usersRepository.findOne({
+      where: { id: +id },
+      select: ['id', 'nickname', 'body', 'photo', 'role'],
+    });
 
     if (!user) {
       throw new NotFoundException('No user found');
