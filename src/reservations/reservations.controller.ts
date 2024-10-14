@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CreateReservationInput } from './dto/create.reservation.dto';
-import { AuthGuard } from 'src/auth/auth.guard';
+import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { ReservationsService } from './reservations.service';
 import { UpdateReservationInput } from './dto/update.reservation.dto';
@@ -19,7 +19,7 @@ import { FindReservationsInput } from './dto/find.reservation.dto';
 @Controller('reservations')
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) {}
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post()
   create(
     @AuthUser() jwtUser: JwtUser,
@@ -28,7 +28,7 @@ export class ReservationsController {
     return this.reservationsService.create(jwtUser, createReservationInput);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get()
   find(
     @AuthUser() jwtUser: JwtUser,
@@ -37,13 +37,13 @@ export class ReservationsController {
     return this.reservationsService.find(jwtUser, findReservationsInput);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   findOne(@AuthUser() jwtUser: JwtUser, @Param() params: ParamInput) {
     return this.reservationsService.findOne(jwtUser, params);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Put(':id')
   update(
     @AuthUser() jwtUser: JwtUser,
@@ -55,5 +55,14 @@ export class ReservationsController {
       params,
       updateReservationInput,
     );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/review')
+  getReveiwByReservation(
+    @AuthUser() jwtUser: JwtUser,
+    @Param() params: ParamInput,
+  ) {
+    return this.reservationsService.getReviewByReservation(jwtUser, params);
   }
 }

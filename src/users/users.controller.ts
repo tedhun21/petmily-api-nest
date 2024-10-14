@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserInput } from './dto/create.user.dto';
-import { AuthGuard } from 'src/auth/auth.guard';
+import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { UpdateUserInput } from './dto/update.user.dto';
 import { ParamInput } from 'src/common/dto/param.dto';
@@ -33,7 +33,7 @@ export class UsersController {
     return this.usersService.findByEmail(email);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@AuthUser() jwtUser: JwtUser) {
     return this.usersService.me(jwtUser);
@@ -44,7 +44,7 @@ export class UsersController {
     return this.usersService.findById(params);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Put(':id')
   @UseInterceptors(FileInterceptor('file'))
   update(
@@ -53,6 +53,8 @@ export class UsersController {
     @Body('data') updateUserInput: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
+    console.log('🚀 ~ UsersController ~ updateUserInput:', updateUserInput);
+
     const parsedUpdateUserInput: UpdateUserInput = JSON.parse(updateUserInput);
     return this.usersService.update(
       params,
@@ -62,13 +64,13 @@ export class UsersController {
     );
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   delete(@Param() params: ParamInput, @AuthUser() jwtUser: JwtUser) {
     return this.usersService.delete(params, jwtUser);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('petsitters/favorite')
   findFavoritePetsitters(
     @AuthUser() jwtUser: JwtUser,
@@ -84,7 +86,7 @@ export class UsersController {
     return this.usersService.findPossiblePetsitters(findPossiblePetsittersIput);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('petsitters/used')
   findUsedPetsitters(
     @AuthUser() jwtUser: JwtUser,

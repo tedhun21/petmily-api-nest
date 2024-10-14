@@ -10,6 +10,7 @@ export class CreateUserInput extends PickType(User, [
   'address',
   'detailAddress',
   'role',
+  'provider',
 ]) {}
 
 export class CreateUserOutput {}

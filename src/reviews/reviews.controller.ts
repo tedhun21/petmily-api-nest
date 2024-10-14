@@ -10,20 +10,17 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from 'src/auth/auth.guard';
+import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
-
-import { CreateReviewInput } from './dto/create.review.dto';
 import { ReviewsService } from './reviews.service';
 import { ParamInput } from 'src/common/dto/param.dto';
-import { UpdateReviewInput } from './dto/update.review.dto';
 import { FindReviewsInput } from './dto/find.review.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 
 @Controller('reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('files'))
   @Post()
   create(
@@ -45,7 +42,7 @@ export class ReviewsController {
     return this.reviewsService.findOne(params);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('files'))
   @Put(':id')
   update(
@@ -63,7 +60,7 @@ export class ReviewsController {
     );
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   delete(@AuthUser() jwtUser: JwtUser, @Param() params: ParamInput) {
     return this.reviewsService.delete(jwtUser, params);

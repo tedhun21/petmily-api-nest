@@ -140,7 +140,7 @@ export class ReviewsService {
   ) {
     const { id: userId, role } = jwtUser;
     const { id: reviewId } = params;
-    const { deleteFiles, body } = updateReviewInput;
+    const { deleteFiles, star, body } = updateReviewInput;
 
     const review = await this.reviewsRepository.findOne({
       where: { id: +reviewId },
@@ -158,6 +158,8 @@ export class ReviewsService {
       );
     }
 
+    review.photos = review.photos ?? [];
+
     if (deleteFiles && deleteFiles.length > 0) {
       await Promise.all(
         deleteFiles.map(
@@ -170,7 +172,7 @@ export class ReviewsService {
       );
     }
 
-    let newPhotoUrls = null;
+    let newPhotoUrls = [];
     if (files && files.length > 0) {
       newPhotoUrls = await Promise.all(
         files.map(async (file) => await this.uploadsService.uploadFile(file)),
@@ -181,7 +183,8 @@ export class ReviewsService {
 
     const updateReviewData = {
       ...review,
-      ...updateReviewInput,
+      body,
+      star,
     };
 
     try {

@@ -73,9 +73,9 @@ export class ReservationsService {
     let orderCondition = {} as any;
 
     if (role) {
-      if (role === UserRole.Client) {
+      if (role === UserRole.CLIENT) {
         whereCondition.client = { id: userId };
-      } else if (role === UserRole.Petsitter) {
+      } else if (role === UserRole.PETSITTER) {
         whereCondition.petsitter = { id: userId };
       }
     }
@@ -222,6 +222,23 @@ export class ReservationsService {
       };
     } catch (e) {
       throw new InternalServerErrorException('Fail to update the reservation');
+    }
+  }
+
+  async getReviewByReservation(jwtUser: JwtUser, params: ParamInput) {
+    const { id: userId } = jwtUser;
+    const { id: reservationId } = params;
+
+    try {
+      const reservation = await this.reservationsRepository.findOne({
+        where: { id: +reservationId, client: { id: userId } },
+        relations: ['review'],
+        select: { review: { id: true } },
+      });
+
+      return reservation.review;
+    } catch (e) {
+      throw new InternalServerErrorException('Fail to fetch review');
     }
   }
 }

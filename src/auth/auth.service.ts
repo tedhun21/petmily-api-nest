@@ -17,22 +17,39 @@ export class AuthService {
   async signIn(signInDto: SignInDto) {
     const { email, password } = signInDto;
 
+    try {
+      const user = await this.usersService.findByEmail(email);
+
+      if (!user) {
+        throw new NotFoundException();
+      }
+
+      const isMatch = await user.checkPassword(password);
+      if (!isMatch) {
+        throw new UnauthorizedException("Don't match password");
+      }
+
+      const payload = { id: user.id, role: user.role };
+      return {
+        access_token: await this.jwtService.signAsync(payload),
+      };
+    } catch (error) {
+      console.error('Error in signIn:', error);
+      throw error;
+    }
+  }
+
+  async validateUser(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
 
-    // 이메일 찾기에서 에러가 뜬 경우
-    if (!user) {
-      throw new NotFoundException();
+    if (user) {
+      const ok = await user.checkPassword(password);
+      if (ok) {
+        const { password, ...result } = user;
+        return result;
+      }
     }
 
-    // 비밀번호가 맞지 않는 경우
-    const isMatch = await user.checkPassword(password);
-    if (!isMatch) {
-      throw new UnauthorizedException("Don't match password");
-    }
-
-    const payload = { id: user.id, role: user.role };
-    return {
-      access_token: await this.jwtService.signAsync(payload),
-    };
+    return null;
   }
 }

@@ -11,7 +11,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { AuthGuard } from 'src/auth/auth.guard';
+import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JournalsService } from './journals.service';
@@ -21,7 +21,7 @@ import { PaginationInput } from 'src/common/dto/pagination.dto';
 export class JournalsController {
   constructor(private readonly journalsService: JournalsService) {}
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post()
   @UseInterceptors(FilesInterceptor('files'))
   create(
@@ -38,19 +38,19 @@ export class JournalsController {
     );
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get()
   find(@AuthUser() jwtUser: JwtUser, @Query() pagination: PaginationInput) {
     return this.journalsService.find(jwtUser, pagination);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   findOne(@AuthUser() jwtUser: JwtUser, @Param() params: { id: string }) {
     return this.journalsService.findOne(jwtUser, params);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Put(':id')
   @UseInterceptors(FilesInterceptor('files'))
   update(
@@ -68,7 +68,7 @@ export class JournalsController {
     );
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   delete(
     @AuthUser() jwtUser: JwtUser,

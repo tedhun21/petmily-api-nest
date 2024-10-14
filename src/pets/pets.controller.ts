@@ -13,15 +13,16 @@ import {
 } from '@nestjs/common';
 import { CreatePetInput } from './dto/create.pet.dto';
 import { PetsService } from './pets.service';
-import { AuthGuard } from 'src/auth/auth.guard';
+
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 
 @Controller('pets')
 export class PetsController {
   constructor(private readonly petsService: PetsService) {}
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   create(
@@ -33,7 +34,7 @@ export class PetsController {
     return this.petsService.create(jwtUser, parsedCreatePetInput, file);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get()
   find(@AuthUser() jwtUser: JwtUser, @Query() pagination: PaginationInput) {
     return this.petsService.find(jwtUser.id, pagination);
@@ -44,7 +45,7 @@ export class PetsController {
     return this.petsService.findOne(params);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Put(':id')
   @UseInterceptors(FileInterceptor('file'))
   update(
@@ -57,7 +58,7 @@ export class PetsController {
     return this.petsService.update(jwtUser, params, parsedUpdatePetInput, file);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   delete(@AuthUser() jwtUser: JwtUser, @Param() params: { id: string }) {
     return this.petsService.delete(jwtUser, params);

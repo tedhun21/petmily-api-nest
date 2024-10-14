@@ -14,26 +14,36 @@ import {
   IsArray,
   IsEmail,
   IsEnum,
+  IsNumber,
   IsPhoneNumber,
   IsString,
   Length,
+  Max,
+  Min,
 } from 'class-validator';
 import { Pet, Species } from 'src/pets/entity/pet.entity';
 import { Reservation } from 'src/reservations/entity/reservation.entity';
 
 export enum UserRole {
-  Client = 'Client',
-  Petsitter = 'Petsitter',
+  USER = 'User',
+  CLIENT = 'Client',
+  PETSITTER = 'Petsitter',
+}
+
+export enum PetsitterApprovalStatus {
+  PENDING = 'pending', // 승인 대기 중
+  APPROVED = 'approved', // 승인 완료
+  REJECTED = 'rejected', // 승인 거절
 }
 
 export enum DayOfWeek {
-  Mon = 'Mon',
-  Tue = 'Tue',
-  Wed = 'Wed',
-  Thu = 'Thu',
-  Fri = 'Fri',
-  Sat = 'Sat',
-  Sun = 'Sun',
+  MON = 'Mon',
+  TUE = 'Tue',
+  WED = 'Wed',
+  THU = 'Thu',
+  FRI = 'Fri',
+  SAT = 'Sat',
+  SUN = 'Sun',
 }
 
 @Entity()
@@ -43,36 +53,36 @@ export class User extends CoreEntity {
   @Length(2, 50)
   username: string;
 
-  @Column()
+  @Column({ nullable: true })
   @IsString()
   @Length(6, 30)
-  password: string;
+  password?: string;
 
-  @Column()
+  @Column({ nullable: true })
   @IsString()
-  nickname: string;
+  nickname?: string;
 
   @Column()
   @IsEmail()
   email: string;
 
-  @Column({ type: 'enum', enum: UserRole })
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
   @IsEnum(UserRole)
   role: UserRole;
 
-  @Column()
+  @Column({ nullable: true })
   @IsString()
   @Length(1, 30)
-  address: string;
+  address?: string;
 
-  @Column()
+  @Column({ nullable: true })
   @IsString()
   @Length(1, 30)
-  detailAddress: string;
+  detailAddress?: string;
 
-  @Column()
+  @Column({ nullable: true })
   @IsPhoneNumber('KR')
-  phone: string;
+  phone?: string;
 
   @Column({ nullable: true })
   @IsString()
@@ -81,6 +91,16 @@ export class User extends CoreEntity {
   @Column({ nullable: true })
   @IsString()
   body?: string;
+
+  @Column({ default: 0, nullable: true })
+  @IsNumber()
+  @Min(0)
+  @Max(5)
+  star?: number;
+
+  @Column({ default: 'local' })
+  @IsString()
+  provider?: string;
 
   @Column('enum', { array: true, enum: Species, nullable: true })
   @IsArray()

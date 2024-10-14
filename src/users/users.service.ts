@@ -24,6 +24,7 @@ import { ReservationsService } from 'src/reservations/reservations.service';
 import { ParamInput } from 'src/common/dto/param.dto';
 import { Status } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class UsersService {
@@ -32,6 +33,7 @@ export class UsersService {
     private readonly usersRepository: Repository<User>,
     private readonly reservationsService: ReservationsService,
     private readonly uploadsService: UploadsService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async create(createUserInput: CreateUserInput) {
@@ -75,11 +77,7 @@ export class UsersService {
 
   async findByEmail(email: string) {
     const user = await this.usersRepository.findOne({ where: { email } });
-
-    if (!user) {
-      throw new NotFoundException('No user found');
-    }
-    return user;
+    return user || null; // 유저가 없으면 null 반환
   }
 
   async me(jwtUser: JwtUser) {
@@ -91,6 +89,7 @@ export class UsersService {
         'username',
         'email',
         'nickname',
+        'role',
         'address',
         'detailAddress',
         'phone',
@@ -113,8 +112,10 @@ export class UsersService {
     file: Express.Multer.File,
   ) {
     const { id } = params;
-    const { id: userId } = jwtUser;
-    const { password, ...updateData } = updateUserInput;
+    const { id: userId, role: currentRole } = jwtUser;
+    const { password, role, ...updataData } = updateUserInput;
+
+    console.log('🚀 ~ UsersService ~ updateUserInput:', updateUserInput);
 
     if (userId !== +id) {
       throw new ForbiddenException(
@@ -130,9 +131,17 @@ export class UsersService {
       throw new NotFoundException('No user found');
     }
 
+    // 업데이트할 파일이 있다면
     let photoUrl = null;
     if (file) {
       photoUrl = await this.uploadsService.uploadFile(file);
+    }
+
+    // role을 업데이트 했을때 jwt업데이트
+    let newJwt = null;
+    if (role && role !== currentRole) {
+      const payload = { id: user.id, role };
+      newJwt = await this.jwtService.signAsync(payload);
     }
 
     if (password) {
@@ -141,13 +150,18 @@ export class UsersService {
 
     const updateUserData = {
       ...user,
-      ...updateData,
+      ...updataData,
+      role,
       ...(photoUrl && { photo: photoUrl }),
     };
 
     const updatedUser = await this.usersRepository.save(updateUserData);
 
-    return { id: updatedUser.id, message: 'Successfully update the user' };
+    return {
+      id: updatedUser.id,
+      message: 'Successfully update the user',
+      ...(newJwt && { newToken: newJwt }),
+    };
   }
 
   async delete(params: ParamInput, jwtUser: JwtUser) {
@@ -309,4 +323,17 @@ export class UsersService {
   }
 
   async findStarPetsitters() {}
+
+  async validateUserById(id: number) {
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      select: ['id', 'role'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('No user found with this ID');
+    }
+
+    return user;
+  }
 }
