@@ -103,6 +103,11 @@ export class User extends CoreEntity {
   @Min(0)
   reviewCount?: number;
 
+  @Column({ default: 0, nullable: true })
+  @IsNumber()
+  @Min(0)
+  completedReservationsCount?: number;
+
   @Column({ default: 'local' })
   @IsString()
   provider?: string;

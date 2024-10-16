@@ -3,10 +3,11 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entity/user.entity';
-import { ReservationsModule } from 'src/reservations/reservations.module';
 import { UploadsModule } from 'src/uploads/uploads.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ReservationsModule } from 'src/reservations/reservations.module';
+import { ReservationRepository } from 'src/reservations/reservation.repository';
 
 @Module({
   imports: [

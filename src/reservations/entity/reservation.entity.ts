@@ -16,10 +16,10 @@ import {
 } from 'typeorm';
 
 export enum Status {
-  Pending = 'Pending',
-  Canceled = 'Canceled',
-  Accepted = 'Accepted',
-  Completed = 'Completed',
+  PENDING = 'Pending',
+  CANCELED = 'Canceled',
+  ACCEPTED = 'Accepted',
+  COMPLETED = 'Completed',
 }
 
 @Entity()

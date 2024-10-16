@@ -308,7 +308,7 @@ export class UsersService {
     try {
       // 내가 가지고 있는 예약
       const reservations = await this.reservationsService.find(jwtUser, {
-        status: Status.Completed,
+        status: Status.COMPLETED,
         ...pagination,
       });
 
@@ -379,6 +379,27 @@ export class UsersService {
       };
     } catch (e) {
       throw new InternalServerErrorException('Fail to update star');
+    }
+  }
+
+  async updatePetsitterCompleted(petsitterId: number, manager: EntityManager) {
+    const petsitter = await this.usersRepository.findOne({
+      where: { id: petsitterId },
+    });
+
+    if (!petsitter) {
+      throw new NotFoundException('No petsitter found');
+    }
+
+    petsitter.completedReservationsCount =
+      (petsitter.completedReservationsCount || 0) + 1;
+
+    try {
+      await manager.save(petsitter);
+    } catch (e) {
+      throw new InternalServerErrorException(
+        'Fail to update petsitter completed',
+      );
     }
   }
 }

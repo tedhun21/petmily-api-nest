@@ -7,19 +7,21 @@ import {
 } from '@nestjs/common';
 import { CreateReservationInput } from './dto/create.reservation.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
-import { In, LessThan, MoreThan, Repository } from 'typeorm';
+import { EntityManager, In, LessThan, MoreThan, Repository } from 'typeorm';
 import { Reservation, Status } from './entity/reservation.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UpdateReservationInput } from './dto/update.reservation.dto';
 import { FindReservationsInput } from './dto/find.reservation.dto';
-import { UserRole } from 'src/users/entity/user.entity';
+import { User, UserRole } from 'src/users/entity/user.entity';
 import { ParamInput } from 'src/common/dto/param.dto';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ReservationsService {
   constructor(
     @InjectRepository(Reservation)
     private readonly reservationsRepository: Repository<Reservation>,
+    private readonly entityManager: EntityManager,
   ) {}
   async create(
     jwtUser: JwtUser,
@@ -94,10 +96,10 @@ export class ReservationsService {
     if (status) {
       switch (status) {
         case 'expected':
-          whereCondition.status = In([Status.Pending, Status.Accepted]); // 대기중 및 진행중 상태
+          whereCondition.status = In([Status.PENDING, Status.ACCEPTED]); // 대기중 및 진행중 상태
           break;
         case 'done':
-          whereCondition.status = In([Status.Canceled, Status.Completed]); // 취소 및 완료 상태
+          whereCondition.status = In([Status.CANCELED, Status.COMPLETED]); // 취소 및 완료 상태
           break;
         case 'all':
           break;
@@ -187,6 +189,7 @@ export class ReservationsService {
   ) {
     const { id: userId } = jwtUser;
     const { id: reservationId } = params;
+    const { status } = updateReservationInput;
 
     const reservation = await this.reservationsRepository.findOne({
       where: { id: +reservationId },
@@ -206,23 +209,37 @@ export class ReservationsService {
       );
     }
 
-    const updateReservationData = {
-      ...reservation,
-      ...updateReservationInput,
-    };
+    // 트랜잭션 시작
+    return this.entityManager.transaction(async (manager) => {
+      // 예약 상태 'Completed'로 변경 시 펫시터 업데이트
+      if (status === 'Completed') {
+        await manager.update(User, reservation.petsitter.id, {
+          completedReservationsCount: () => 'completedReservationsCount + 1',
+        });
+      }
 
-    try {
-      const updatedReservation = await this.reservationsRepository.save(
-        updateReservationData,
-      );
-
-      return {
-        id: updatedReservation.id,
-        message: 'Successfully update the reservation',
+      // 예약 업데이트 데이터 생성
+      const updateReservationData = {
+        ...reservation,
+        ...updateReservationInput,
       };
-    } catch (e) {
-      throw new InternalServerErrorException('Fail to update the reservation');
-    }
+
+      try {
+        // 예약 상태 업데이트
+        const updatedReservation = await manager.save(
+          this.reservationsRepository.create(updateReservationData),
+        );
+
+        return {
+          id: updatedReservation.id,
+          message: 'Successfully update the reservation',
+        };
+      } catch (e) {
+        throw new InternalServerErrorException(
+          'Fail to update the reservation',
+        );
+      }
+    });
   }
 
   async getReviewByReservation(jwtUser: JwtUser, params: ParamInput) {
