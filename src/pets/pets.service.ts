@@ -29,7 +29,6 @@ export class PetsService {
     const { id: userId } = jwtUser;
 
     let photoUrl = null;
-
     if (file) {
       photoUrl = await this.uploadsService.uploadFile(file);
     }

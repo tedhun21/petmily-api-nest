@@ -5,13 +5,13 @@ import { User } from 'src/users/entity/user.entity';
 import { Column, Entity, ManyToMany, ManyToOne } from 'typeorm';
 
 export enum Gender {
-  Male = 'Male',
-  Female = 'Female',
+  MALE = 'Male',
+  FEMALE = 'Female',
 }
 
 export enum Species {
-  Dog = 'Dog',
-  Cat = 'Cat',
+  DOG = 'Dog',
+  CAT = 'Cat',
 }
 
 @Entity()

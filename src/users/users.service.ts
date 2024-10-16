@@ -9,6 +9,7 @@ import {
 import {
   ArrayContains,
   ArrayOverlap,
+  EntityManager,
   LessThanOrEqual,
   MoreThanOrEqual,
   Repository,
@@ -335,5 +336,49 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  // 리뷰 생성과 Transaction
+  async updatePetsitterStar(
+    petsitterId: number,
+    star: number,
+    manager: EntityManager,
+    isNewReview: boolean,
+  ) {
+    const petsitter = await this.usersRepository.findOne({
+      where: { id: petsitterId },
+    });
+
+    if (!petsitter) {
+      throw new InternalServerErrorException('Petsitter not found');
+    }
+
+    const reviewCount = petsitter.reviewCount || 0;
+    const currentAverage = petsitter.star || 0;
+
+    let newAverage: number;
+
+    if (isNewReview) {
+      // 새 리뷰일 때만 reviewCount를 증가시키고 평균을 계산
+      newAverage = (currentAverage * reviewCount + star) / (reviewCount + 1);
+      petsitter.reviewCount = reviewCount + 1; // 리뷰 카운트를 증가
+    } else {
+      // 리뷰 업데이트일 때는 새로운 별점을 반영하여 평균을 다시 계산
+      newAverage =
+        (currentAverage * reviewCount - petsitter.star + star) / reviewCount;
+    }
+
+    petsitter.star = newAverage;
+
+    try {
+      const updatedPetsitter = await manager.save(petsitter);
+
+      return {
+        id: updatedPetsitter.id,
+        message: 'Successfully update the petsitter',
+      };
+    } catch (e) {
+      throw new InternalServerErrorException('Fail to update star');
+    }
   }
 }

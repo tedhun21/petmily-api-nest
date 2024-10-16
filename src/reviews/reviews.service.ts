@@ -11,12 +11,13 @@ import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { CreateReviewInput } from './dto/create.review.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Review } from './entity/reivew.entity';
-import { IsNull, Not, Repository } from 'typeorm';
+import { EntityManager, IsNull, Not, Repository } from 'typeorm';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { ParamInput } from 'src/common/dto/param.dto';
 import { UpdateReviewInput } from './dto/update.review.dto';
 import { FindReviewsInput } from './dto/find.review.dto';
 import { UploadsService } from 'src/uploads/uploads.service';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ReviewsService {
@@ -25,14 +26,17 @@ export class ReviewsService {
     private readonly reviewsRepository: Repository<Review>,
     private readonly reservationsService: ReservationsService,
     private readonly uploadsService: UploadsService,
+    private readonly usersService: UsersService,
+    private readonly entityManager: EntityManager,
   ) {}
+
   async create(
     jwtUser: JwtUser,
     createReviewInput: CreateReviewInput,
     files: Array<Express.Multer.File>,
   ) {
     const { id: userId, role } = jwtUser;
-    const { reservationId } = createReviewInput;
+    const { reservationId, star } = createReviewInput;
 
     const reservation = await this.reservationsService.findOne(jwtUser, {
       id: reservationId,
@@ -65,19 +69,31 @@ export class ReviewsService {
       );
     }
 
-    const review = this.reviewsRepository.create({
-      ...createReviewInput,
-      reservation: { id: reservationId },
-      ...(photoUrls.length && { photos: photoUrls }),
+    // 트랜잭션 적용
+    return await this.entityManager.transaction(async (manager) => {
+      // 리뷰 객체 생성
+      const review = this.reviewsRepository.create({
+        ...createReviewInput,
+        reservation: { id: reservationId },
+        ...(photoUrls.length && { photos: photoUrls }),
+      });
+
+      try {
+        // 1. 리뷰 생성
+        const newReview = await manager.save(review);
+        // 2. 펫시터 별점 업데이트
+        await this.usersService.updatePetsitterStar(
+          reservation.petsitter.id,
+          star,
+          manager,
+          true,
+        );
+
+        return { id: newReview.id, message: 'Successfully create a review' };
+      } catch (e) {
+        throw new InternalServerErrorException('Fail to create a review');
+      }
     });
-
-    try {
-      const newReview = await this.reviewsRepository.save(review);
-
-      return { id: newReview.id, message: 'Successfully create a review' };
-    } catch (e) {
-      throw new InternalServerErrorException('Fail to create a review');
-    }
   }
 
   async find(findReviewsInput: FindReviewsInput) {
@@ -142,61 +158,71 @@ export class ReviewsService {
     const { id: reviewId } = params;
     const { deleteFiles, star, body } = updateReviewInput;
 
-    const review = await this.reviewsRepository.findOne({
-      where: { id: +reviewId },
-      relations: ['reservation.client'],
+    // 트랜잭션 적용
+    return this.entityManager.transaction(async (manager) => {
+      // 기존 리뷰 찾기
+      const review = await this.reviewsRepository.findOne({
+        where: { id: +reviewId },
+        relations: ['reservation.client', 'reservation.petsitter'],
+      });
+
+      // 리뷰 없으면 에러
+      if (!review) {
+        throw new NotFoundException('No review found');
+      }
+
+      const { client } = review.reservation;
+      // 예약에서 Client가 같지 않으면 에러
+      if (role !== 'Client' && client.id !== userId) {
+        throw new UnauthorizedException(
+          "You don't have permission to update the review",
+        );
+      }
+
+      review.photos = review.photos ?? [];
+      // 삭제할 파일 처리
+      if (deleteFiles && deleteFiles.length > 0) {
+        await Promise.all(
+          deleteFiles.map(
+            async (file) => await this.uploadsService.deleteFile({ url: file }),
+          ),
+        );
+
+        review.photos = review.photos.filter(
+          (url: string) => !deleteFiles.includes(url),
+        );
+      }
+
+      // 새파일 업로드
+      if (files && files.length > 0) {
+        const newPhotoUrls = await Promise.all(
+          files.map(async (file) => await this.uploadsService.uploadFile(file)),
+        );
+        review.photos = [...review.photos, ...newPhotoUrls];
+      }
+
+      // 리뷰 데이터 업데이트
+      review.body = body;
+      review.star = star;
+
+      try {
+        await manager.save(review);
+
+        await this.usersService.updatePetsitterStar(
+          review.reservation.petsitter.id,
+          star,
+          manager,
+          false,
+        );
+
+        return {
+          id: review.id,
+          message: 'Successfully update the review',
+        };
+      } catch (e) {
+        throw new InternalServerErrorException('Fail to update the review');
+      }
     });
-
-    if (!review) {
-      throw new NotFoundException('No review found');
-    }
-
-    const { client } = review.reservation;
-    if (role !== 'Client' && client.id !== userId) {
-      throw new UnauthorizedException(
-        "You don't have permission to update the review",
-      );
-    }
-
-    review.photos = review.photos ?? [];
-
-    if (deleteFiles && deleteFiles.length > 0) {
-      await Promise.all(
-        deleteFiles.map(
-          async (file) => await this.uploadsService.deleteFile({ url: file }),
-        ),
-      );
-
-      review.photos = review.photos.filter(
-        (url: string) => !deleteFiles.includes(url),
-      );
-    }
-
-    let newPhotoUrls = [];
-    if (files && files.length > 0) {
-      newPhotoUrls = await Promise.all(
-        files.map(async (file) => await this.uploadsService.uploadFile(file)),
-      );
-    }
-
-    review.photos = [...review.photos, ...newPhotoUrls];
-
-    const updateReviewData = {
-      ...review,
-      body,
-      star,
-    };
-
-    try {
-      const updatedReview = await this.reviewsRepository.save(updateReviewData);
-
-      return {
-        id: updatedReview.id,
-        message: 'Successfully update the review',
-      };
-    } catch (e) {
-      throw new InternalServerErrorException('Fail to update the review');
-    }
   }
 
   async delete(jwtUser: JwtUser, params: ParamInput) {

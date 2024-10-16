@@ -31,9 +31,9 @@ export enum UserRole {
 }
 
 export enum PetsitterApprovalStatus {
-  PENDING = 'pending', // 승인 대기 중
-  APPROVED = 'approved', // 승인 완료
-  REJECTED = 'rejected', // 승인 거절
+  PENDING = 'Pending', // 승인 대기 중
+  APPROVED = 'Approved', // 승인 완료
+  REJECTED = 'Rejected', // 승인 거절
 }
 
 export enum DayOfWeek {
@@ -97,6 +97,11 @@ export class User extends CoreEntity {
   @Min(0)
   @Max(5)
   star?: number;
+
+  @Column({ default: 0, nullable: true })
+  @IsNumber()
+  @Min(0)
+  reviewCount?: number;
 
   @Column({ default: 'local' })
   @IsString()
