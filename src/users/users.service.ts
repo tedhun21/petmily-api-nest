@@ -38,13 +38,34 @@ export class UsersService {
   ) {}
 
   async create(createUserInput: CreateUserInput) {
-    const { email } = createUserInput;
+    const { email, nickname } = createUserInput;
 
-    const exists = await this.usersRepository.findOne({ where: { email } });
+    const existingEmail = await this.usersRepository.findOne({
+      where: { email },
+    });
 
-    if (exists) {
-      throw new ConflictException('This email is already registered');
+    if (existingEmail) {
+      throw new ConflictException({
+        statusCode: 409,
+        field: 'email',
+        message: 'This email is already registered',
+        error: 'email_conflict', // 타입 추가
+      });
     }
+
+    const existingNickname = await this.usersRepository.findOne({
+      where: { nickname },
+    });
+
+    if (existingNickname) {
+      throw new ConflictException({
+        statusCode: 409,
+        field: 'nickname',
+        message: 'This nickname is already registered',
+        error: 'nickname_conflict', // 타입 추가
+      });
+    }
+
     const user = this.usersRepository.create(createUserInput);
 
     try {
@@ -82,21 +103,35 @@ export class UsersService {
   }
 
   async me(jwtUser: JwtUser) {
-    const { id: userId } = jwtUser;
+    const { id: userId, role } = jwtUser;
+
+    let conditionalSelect: (keyof User)[] = [
+      'id',
+      'username',
+      'email',
+      'nickname',
+      'role',
+      'verified',
+      'address',
+      'detailAddress',
+      'phone',
+      'photo',
+      'body',
+    ];
+
+    if (role === 'Petsitter') {
+      conditionalSelect.push(
+        'possibleDays',
+        'possiblePetSpecies',
+        'possibleStartTime',
+        'possibleEndTime',
+        'possibleLocations',
+      );
+    }
+
     const me = await this.usersRepository.findOne({
       where: { id: userId },
-      select: [
-        'id',
-        'username',
-        'email',
-        'nickname',
-        'role',
-        'address',
-        'detailAddress',
-        'phone',
-        'photo',
-        'body',
-      ],
+      select: conditionalSelect,
     });
 
     if (!me) {
@@ -115,8 +150,6 @@ export class UsersService {
     const { id } = params;
     const { id: userId, role: currentRole } = jwtUser;
     const { password, role, ...updataData } = updateUserInput;
-
-    console.log('🚀 ~ UsersService ~ updateUserInput:', updateUserInput);
 
     if (userId !== +id) {
       throw new ForbiddenException(
@@ -286,6 +319,9 @@ export class UsersService {
           possiblePetSpecies: true,
           possibleStartTime: true,
           possibleEndTime: true,
+          reviewCount: true,
+          star: true,
+          body: true,
         },
         take: +pageSize,
         skip: (+page - 1) * +pageSize,

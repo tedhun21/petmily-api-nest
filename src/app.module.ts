@@ -14,6 +14,8 @@ import { Journal } from './journals/entity/journal.entity';
 import { ReviewsModule } from './reviews/reviews.module';
 import { Review } from './reviews/entity/reivew.entity';
 import { ConnectModule } from './connect/connect.module';
+import { MailModule } from './mail/mail.module';
+import { Verification } from './users/entity/verification.entity';
 
 @Module({
   imports: [
@@ -29,7 +31,7 @@ import { ConnectModule } from './connect/connect.module';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       logging: true,
-      entities: [User, Pet, Reservation, Journal, Review],
+      entities: [User, Pet, Reservation, Journal, Review, Verification],
       synchronize: true,
     }),
     UsersModule,
@@ -40,6 +42,7 @@ import { ConnectModule } from './connect/connect.module';
     JournalsModule,
     ReviewsModule,
     ConnectModule,
+    MailModule,
   ],
   controllers: [],
   providers: [],

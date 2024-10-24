@@ -12,6 +12,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsNumber,
@@ -65,6 +66,10 @@ export class User extends CoreEntity {
   @Column()
   @IsEmail()
   email: string;
+
+  @Column({ default: false })
+  @IsBoolean()
+  verified: boolean;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
   @IsEnum(UserRole)

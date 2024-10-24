@@ -41,9 +41,17 @@ export class Reservation extends CoreEntity {
   @IsString()
   address: string;
 
+  @Column()
+  @IsString()
+  detailAddress: string;
+
   @Column({ type: 'enum', enum: Status })
   @IsEnum(Status)
   status: Status;
+
+  @Column({ nullable: true })
+  @IsString()
+  body?: string;
 
   // 클라이언트 (예약을 생성한 사용자)
   @ManyToOne(() => User, (user) => user.clientReservations)

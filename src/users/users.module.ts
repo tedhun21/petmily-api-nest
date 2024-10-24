@@ -7,11 +7,11 @@ import { UploadsModule } from 'src/uploads/uploads.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ReservationsModule } from 'src/reservations/reservations.module';
-import { ReservationRepository } from 'src/reservations/reservation.repository';
+import { Verification } from './entity/verification.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Verification]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

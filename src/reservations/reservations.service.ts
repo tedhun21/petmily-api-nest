@@ -14,7 +14,6 @@ import { UpdateReservationInput } from './dto/update.reservation.dto';
 import { FindReservationsInput } from './dto/find.reservation.dto';
 import { User, UserRole } from 'src/users/entity/user.entity';
 import { ParamInput } from 'src/common/dto/param.dto';
-import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ReservationsService {
@@ -27,6 +26,7 @@ export class ReservationsService {
     jwtUser: JwtUser,
     createReservationInput: CreateReservationInput,
   ) {
+    console.log(createReservationInput);
     const { id: userId } = jwtUser;
     const { date, startTime, endTime, petsitterId, petIds } =
       createReservationInput;

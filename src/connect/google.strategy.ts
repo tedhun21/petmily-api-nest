@@ -38,6 +38,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
           email,
           username,
           provider,
+          verified: true,
           role: UserRole.USER, // 기본적으로 User 상태로 설정
         });
 
