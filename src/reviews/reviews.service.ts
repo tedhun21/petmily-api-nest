@@ -119,11 +119,11 @@ export class ReviewsService {
         skip: (+page - 1) * +pageSize,
       });
 
-      const totalPage = Math.ceil(total / +pageSize);
+      const totalPages = Math.ceil(total / +pageSize);
 
       return {
         results: reviews,
-        pagination: { total, totalPage, page: +page, pageSize: +pageSize },
+        pagination: { total, totalPages, page: +page, pageSize: +pageSize },
       };
     } catch (e) {
       throw new InternalServerErrorException('Fail to fetch reviews');

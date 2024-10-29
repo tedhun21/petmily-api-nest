@@ -16,6 +16,9 @@ import { Review } from './reviews/entity/reivew.entity';
 import { ConnectModule } from './connect/connect.module';
 import { MailModule } from './mail/mail.module';
 import { Verification } from './users/entity/verification.entity';
+import { ChatsModule } from './chats/chats.module';
+import { ChatRoom } from './chats/entity/chatRoom.entity';
+import { Message } from './chats/entity/message.entity';
 
 @Module({
   imports: [
@@ -31,7 +34,16 @@ import { Verification } from './users/entity/verification.entity';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       logging: true,
-      entities: [User, Pet, Reservation, Journal, Review, Verification],
+      entities: [
+        User,
+        Pet,
+        Reservation,
+        Journal,
+        Review,
+        Verification,
+        ChatRoom,
+        Message,
+      ],
       synchronize: true,
     }),
     UsersModule,
@@ -43,6 +55,7 @@ import { Verification } from './users/entity/verification.entity';
     ReviewsModule,
     ConnectModule,
     MailModule,
+    ChatsModule,
   ],
   controllers: [],
   providers: [],

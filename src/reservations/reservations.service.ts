@@ -26,7 +26,6 @@ export class ReservationsService {
     jwtUser: JwtUser,
     createReservationInput: CreateReservationInput,
   ) {
-    console.log(createReservationInput);
     const { id: userId } = jwtUser;
     const { date, startTime, endTime, petsitterId, petIds } =
       createReservationInput;
@@ -63,6 +62,7 @@ export class ReservationsService {
         message: 'Successfully create a reservation',
       };
     } catch (e) {
+      console.log(e);
       throw new InternalServerErrorException('Fail to create a reservation');
     }
   }
@@ -132,11 +132,11 @@ export class ReservationsService {
           skip: (+page - 1) * +pageSize,
         });
 
-      const totalPage = Math.ceil(total / +pageSize);
+      const totalPages = Math.ceil(total / +pageSize);
 
       return {
         results: reservations,
-        pagination: { total, totalPage, page: +page, pageSize: +pageSize },
+        pagination: { total, totalPages, page: +page, pageSize: +pageSize },
       };
     } catch (e) {
       throw new InternalServerErrorException('Fail to fetch reservations');

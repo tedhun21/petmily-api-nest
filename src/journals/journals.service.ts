@@ -86,11 +86,11 @@ export class JournalsService {
         skip: (+page - 1) * +pageSize,
       });
 
-      const totalPage = Math.ceil(total / +pageSize);
+      const totalPages = Math.ceil(total / +pageSize);
 
       return {
         results: journals,
-        pagination: { total, totalPage, page: +page, pageSize: +pageSize },
+        pagination: { total, totalPages, page: +page, pageSize: +pageSize },
       };
     } catch (e) {
       throw new InternalServerErrorException('Fail to fetch the journals');

@@ -53,8 +53,6 @@ export class UsersController {
     @Body('data') updateUserInput: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    console.log('🚀 ~ UsersController ~ updateUserInput:', updateUserInput);
-
     const parsedUpdateUserInput: UpdateUserInput = JSON.parse(updateUserInput);
     return this.usersService.update(
       params,

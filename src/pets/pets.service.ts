@@ -61,13 +61,13 @@ export class PetsService {
         skip: (+page - 1) * +pageSize,
       });
 
-      const totalPage = Math.ceil(total / +pageSize);
+      const totalPages = Math.ceil(total / +pageSize);
 
       return {
         results: pets,
         pagination: {
           total,
-          totalPage,
+          totalPages,
           page: +page,
           pageSize: +pageSize,
         },

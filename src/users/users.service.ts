@@ -327,11 +327,11 @@ export class UsersService {
         skip: (+page - 1) * +pageSize,
       });
 
-      const totalPage = Math.ceil(total / +pageSize);
+      const totalPages = Math.ceil(total / +pageSize);
 
       return {
         results: petsitters,
-        pagination: { total, totalPage, page: +page, pageSize: +pageSize },
+        pagination: { total, totalPages, page: +page, pageSize: +pageSize },
       };
     } catch (e) {
       throw new InternalServerErrorException(
@@ -347,7 +347,6 @@ export class UsersService {
         status: Status.COMPLETED,
         ...pagination,
       });
-
       return {
         results: reservations.results.map(
           (reservation) => reservation.petsitter,
