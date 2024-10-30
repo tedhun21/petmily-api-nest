@@ -19,6 +19,7 @@ import { Verification } from './users/entity/verification.entity';
 import { ChatsModule } from './chats/chats.module';
 import { ChatRoom } from './chats/entity/chatRoom.entity';
 import { Message } from './chats/entity/message.entity';
+import { MapsModule } from './maps/maps.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { Message } from './chats/entity/message.entity';
     ConnectModule,
     MailModule,
     ChatsModule,
+    MapsModule,
   ],
   controllers: [],
   providers: [],

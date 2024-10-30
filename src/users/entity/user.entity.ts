@@ -76,6 +76,10 @@ export class User extends CoreEntity {
   role: UserRole;
 
   @Column({ nullable: true })
+  @IsNumber()
+  zipcode: number;
+
+  @Column({ nullable: true })
   @IsString()
   @Length(1, 30)
   address?: string;

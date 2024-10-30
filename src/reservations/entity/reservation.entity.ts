@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsString } from 'class-validator';
+import { IsDate, IsEnum, IsNumber, IsString } from 'class-validator';
 import { CoreEntity } from 'src/common/entity/core.entity';
 import { Journal } from 'src/journals/entity/journal.entity';
 import { Pet } from 'src/pets/entity/pet.entity';
@@ -36,6 +36,10 @@ export class Reservation extends CoreEntity {
   @Column({ type: 'time' })
   @IsString()
   endTime: string;
+
+  @Column({ nullable: true })
+  @IsString()
+  zipcode: string;
 
   @Column()
   @IsString()
