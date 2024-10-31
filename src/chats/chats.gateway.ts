@@ -24,8 +24,8 @@ export class ChatsGateWay {
     @MessageBody() chatRoomId: string,
     @ConnectedSocket() client: Socket,
   ) {
-    client.join(chatRoomId);
     console.log(`Client joined room: ${chatRoomId}`);
+    client.join(chatRoomId);
   }
 
   @SubscribeMessage('send')

@@ -157,6 +157,8 @@ export class ReservationsService {
           username: true,
           nickname: true,
           photo: true,
+          star: true,
+          reviewCount: true,
           possibleDays: true,
           possibleLocations: true,
           possiblePetSpecies: true,
