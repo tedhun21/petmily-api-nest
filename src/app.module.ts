@@ -20,6 +20,7 @@ import { ChatsModule } from './chats/chats.module';
 import { ChatRoom } from './chats/entity/chatRoom.entity';
 import { Message } from './chats/entity/message.entity';
 import { MapsModule } from './maps/maps.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { MapsModule } from './maps/maps.module';
     MailModule,
     ChatsModule,
     MapsModule,
+    SearchModule,
   ],
   controllers: [],
   providers: [],

@@ -20,6 +20,7 @@ import { ParamInput } from 'src/common/dto/param.dto';
 import { PaginationInput } from 'src/common/dto/pagination.dto';
 import { FindPossiblePetsittersInput } from './dto/findPossible.petsitter.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { FindByNicknameInput } from './dto/findByNickname.petsitter.dto';
 
 @Controller('users')
 export class UsersController {
@@ -91,6 +92,11 @@ export class UsersController {
     @Query() pagination: PaginationInput,
   ) {
     return this.usersService.findUsedPetsitters(jwtUser, pagination);
+  }
+
+  @Get()
+  findPetsittersByNickname(@Body() findByNicknameInput: FindByNicknameInput) {
+    console.log(findByNicknameInput);
   }
 
   @Get('petsitters/star')

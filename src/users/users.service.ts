@@ -7,15 +7,21 @@ import {
 } from '@nestjs/common';
 
 import {
+  Any,
   ArrayContains,
   ArrayOverlap,
+  Brackets,
   EntityManager,
+  ILike,
+  In,
   LessThanOrEqual,
+  Like,
   MoreThanOrEqual,
+  Raw,
   Repository,
 } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { User } from './entity/user.entity';
+import { User, UserRole } from './entity/user.entity';
 import { CreateUserInput } from './dto/create.user.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { UpdateUserInput } from './dto/update.user.dto';
@@ -26,6 +32,7 @@ import { ParamInput } from 'src/common/dto/param.dto';
 import { Status } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { JwtService } from '@nestjs/jwt';
+import { SearchType } from 'src/search/dto/save-recent.dto';
 
 @Injectable()
 export class UsersService {
@@ -358,6 +365,75 @@ export class UsersService {
     }
   }
 
+  // 펫시터 닉네임 포함하는 검색
+  // star, reviewCount 높은 순
+  async findPetsittersByNickname(query: string, pagination: PaginationInput) {
+    const { page, pageSize } = pagination;
+
+    // 펫시터 닉네임
+    const [petsitters, total] = await this.usersRepository.findAndCount({
+      order: { star: 'DESC', reviewCount: 'DESC' },
+      where: { role: UserRole.PETSITTER, nickname: ILike(`%${query}%`) }, // ILIKE로 부분 일치를 구현
+      select: ['id', 'nickname', 'role', 'photo'],
+      skip: (+page - 1) * +pageSize,
+      take: +pageSize,
+    });
+
+    const totalPages = Math.ceil(total / +pageSize);
+
+    return {
+      results: petsitters,
+      pagination: {
+        total,
+        totalPages,
+        page: +page,
+        pageSize: +pageSize,
+      },
+    };
+  }
+
+  // 위지 기반 펫시터 검색
+  async findPetsittersByLocation(words: string, pagination: PaginationInput) {
+    const { page, pageSize } = pagination;
+
+    const wordsArray = words.split(' ').map((word) => `%${word}%`); // 검색어를 LIKE 패턴으로 변환
+
+    const query = this.usersRepository
+      .createQueryBuilder('user')
+      .where('user.role = :role', { role: UserRole.PETSITTER })
+      .andWhere(
+        new Brackets((qb) => {
+          wordsArray.forEach((word) => {
+            qb.orWhere('user.possibleLocations ILIKE :word', { word });
+          });
+        }),
+      )
+      .skip((+page - 1) * +pageSize)
+      .take(+pageSize)
+      .select([
+        'user.id',
+        'user.nickname',
+        'user.role',
+        'user.photo',
+        'user.star',
+        'user.reviewCount',
+        'user.possibleDays',
+        'user.possibleLocations',
+        'user.possiblePetSpecies',
+        'user.possibleStartTime',
+        'user.possibleEndTime',
+      ]);
+
+    const [petsitters, total] = await query.getManyAndCount();
+
+    const totalPages = Math.ceil(total / +pageSize);
+
+    return {
+      results: petsitters,
+      pagination: { total, totalPages, page: +page, pageSize: +pageSize },
+    };
+  }
+
   async findStarPetsitters() {}
 
   async validateUserById(id: number) {
@@ -436,5 +512,85 @@ export class UsersService {
         'Fail to update petsitter completed',
       );
     }
+  }
+
+  async updateRecentSearches(
+    userId: number,
+    searchTerm: { id: number },
+    type: SearchType,
+    action: 'add' | 'remove',
+  ) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+
+    if (!User) {
+      throw new NotFoundException('No user found');
+    }
+    try {
+      let updatedSearches = user.recentSearches || [];
+
+      if (type === SearchType.USER) {
+        if (action === 'add') {
+          console.log('add');
+          // 기존에 같은 검색어가 없으면 추가
+          if (
+            !updatedSearches.some(
+              (search) =>
+                search.id === searchTerm.id && search.type === SearchType.USER,
+            )
+          ) {
+            updatedSearches.push({
+              id: searchTerm.id,
+              type: SearchType.USER,
+              timestamp: Date.now(),
+            });
+          }
+
+          // 검색어가 5개 이상이면 가장 오래된 검색어 삭제
+          if (updatedSearches.length > 5) {
+            updatedSearches.sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
+            updatedSearches = updatedSearches.slice(0, 5); // 최신 5개만 남기기
+          }
+        } else if (action === 'remove') {
+          console.log('remove');
+          // 검색어가 있으면 제거
+          updatedSearches = updatedSearches.filter(
+            (search) =>
+              !(search.id === searchTerm.id && search.type === SearchType.USER),
+          );
+        }
+      }
+
+      // 업데이트된 검색어 배열 저장
+      user.recentSearches = updatedSearches;
+      await this.usersRepository.save(user);
+      return {
+        message: 'Successfully update recent searches',
+        recentSearches: updatedSearches,
+      };
+    } catch (e) {
+      throw new InternalServerErrorException('Fail to save recent searches');
+    }
+  }
+
+  async findRecentSearches(userId: number) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['recentSearches'],
+    });
+
+    const results = await Promise.all(
+      user.recentSearches.map(async (search) => {
+        if (search.type === SearchType.USER) {
+          const result = await this.usersRepository.findOne({
+            where: { id: userId },
+            select: ['id', 'nickname', 'photo'],
+          });
+
+          return { ...result, type: search.type };
+        }
+      }),
+    );
+
+    return results;
   }
 }
