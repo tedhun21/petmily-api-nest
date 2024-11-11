@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
-import { SaveRecentSearchInput, SearchType } from './dto/save-recent.dto';
+import { RecentSearch, SearchType } from './dto/recent-search.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 
 @Injectable()
@@ -28,16 +28,13 @@ export class SearchService {
 
   async saveRecentSearch(
     jwtUser: JwtUser,
-    saveRecentSearchInput: SaveRecentSearchInput,
+    saveRecentSearchInput: RecentSearch,
   ) {
     const { id: userId } = jwtUser;
-    const { id, type } = saveRecentSearchInput;
 
-    const updatedUser = await this.usersService.updateRecentSearches(
+    const updatedUser = await this.usersService.saveRecentSearch(
       userId,
-      { id },
-      type,
-      'add',
+      saveRecentSearchInput,
     );
 
     return updatedUser;
@@ -47,6 +44,20 @@ export class SearchService {
     const { id: userId } = jwtUser;
 
     const recentSearches = await this.usersService.findRecentSearches(userId);
+
+    return recentSearches;
+  }
+
+  async deleteRecentSearch(
+    jwtUser: JwtUser,
+    deleteRecentSearchesInput: RecentSearch,
+  ) {
+    const { id: userId } = jwtUser;
+
+    const recentSearches = await this.usersService.deleteRecentSearch(
+      userId,
+      deleteRecentSearchesInput,
+    );
 
     return recentSearches;
   }

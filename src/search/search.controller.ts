@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
 import { SearchService } from './search.service';
-import { SaveRecentSearchInput } from './dto/save-recent.dto';
+import { RecentSearch } from './dto/recent-search.dto';
 import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 
@@ -13,10 +13,10 @@ export class SearchController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('recent')
+  @Put('recent')
   saveRecentSearch(
     @AuthUser() jwtUser: JwtUser,
-    @Body() SaveRecentSearchInput: SaveRecentSearchInput,
+    @Body() SaveRecentSearchInput: RecentSearch,
   ) {
     return this.searchSerivce.saveRecentSearch(jwtUser, SaveRecentSearchInput);
   }
@@ -25,5 +25,17 @@ export class SearchController {
   @Get('recent')
   findRecentSearches(@AuthUser() jwtUser: JwtUser) {
     return this.searchSerivce.findRecentSearches(jwtUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('recent/delete')
+  deleteRecentSearch(
+    @AuthUser() jwtUser: JwtUser,
+    @Body() deleteRecentSearchInput: RecentSearch,
+  ) {
+    return this.searchSerivce.deleteRecentSearch(
+      jwtUser,
+      deleteRecentSearchInput,
+    );
   }
 }

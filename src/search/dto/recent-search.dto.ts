@@ -3,7 +3,7 @@ export enum SearchType {
   LOCATION = 'Location',
 }
 
-export class SaveRecentSearchInput {
+export class RecentSearch {
   id: number;
   type: SearchType;
 }

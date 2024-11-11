@@ -27,7 +27,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
 
     try {
       // 유저가 이미 존재하는지 확인
-      const existingUser = await this.usersService.findByEmail(email);
+      const existingUser =
+        await this.usersService.findByEmailWithPassword(email);
 
       if (existingUser) {
         // 유저가 존재하면 반환

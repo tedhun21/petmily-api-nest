@@ -1,5 +1,6 @@
 import {
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -21,7 +22,7 @@ export class AuthService {
     const { email, password } = signInDto;
 
     try {
-      const user = await this.usersService.findByEmail(email);
+      const user = await this.usersService.findByEmailWithPassword(email);
 
       if (!user) {
         throw new NotFoundException('No user found');
@@ -33,12 +34,13 @@ export class AuthService {
       }
 
       const payload = { id: user.id, role: user.role };
+
       return {
         access_token: await this.jwtService.signAsync(payload),
       };
     } catch (error) {
       console.error('Error in signIn:', error);
-      throw error;
+      throw new InternalServerErrorException('Fail to sign in');
     }
   }
 
@@ -47,7 +49,7 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
+    const user = await this.usersService.findByEmailWithPassword(email);
 
     if (user) {
       const ok = await user.checkPassword(password);

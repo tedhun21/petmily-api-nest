@@ -24,7 +24,7 @@ import {
 } from 'class-validator';
 import { Pet, Species } from 'src/pets/entity/pet.entity';
 import { Reservation } from 'src/reservations/entity/reservation.entity';
-import { SearchType } from 'src/search/dto/save-recent.dto';
+import { SearchType } from 'src/search/dto/recent-search.dto';
 
 export enum UserRole {
   USER = 'User',
@@ -176,23 +176,29 @@ export class User extends CoreEntity {
     // 만약 엔티티가 업데이트 되면서 훅이 작동하여 비밀번호를 다시 해시화하게 되면 비밀번호가 이중으로 해시화된다
     if (
       this.password &&
-      !this.password.startsWith('$2b$') // password값이 실제로 변경될 때만 해시화가 실행되도록 // bcrypt 해시는 "$2b$"로 시작
+      !this.password.startsWith('$2b$') // password값이 실제로 변경될 때만 해시화가 실행되도록 // bcrypt는 보통 해시된 값이 "$2b$"로 시작하므로
     ) {
       try {
         this.password = await bcrypt.hash(this.password, 10);
       } catch (e) {
-        throw new InternalServerErrorException();
+        console.error('Error hashing password:', e);
+        throw new InternalServerErrorException('Error hashing password');
       }
     }
   }
 
   async checkPassword(aPassword: string): Promise<boolean> {
     try {
-      const ok = await bcrypt.compare(aPassword, this.password);
+      if (!aPassword || !this.password) {
+        console.error('Missing password or hash');
+        throw new InternalServerErrorException('Missing password or hash');
+      }
 
-      return ok;
+      const isMatch = await bcrypt.compare(aPassword, this.password);
+      return isMatch;
     } catch (e) {
-      throw new InternalServerErrorException();
+      console.error('Error comparing password:', e);
+      throw new InternalServerErrorException('Password comparison error');
     }
   }
 }

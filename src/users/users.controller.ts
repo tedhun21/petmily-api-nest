@@ -30,8 +30,8 @@ export class UsersController {
     return this.usersService.create(createUserInput);
   }
   @Get()
-  findByEmail(@Query('email') email: string) {
-    return this.usersService.findByEmail(email);
+  findByEmailOrNickname(@Query('q') EmailOrNickname: string) {
+    return this.usersService.findByEmailOrNickname(EmailOrNickname);
   }
 
   @UseGuards(JwtAuthGuard)

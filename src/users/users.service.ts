@@ -7,17 +7,13 @@ import {
 } from '@nestjs/common';
 
 import {
-  Any,
   ArrayContains,
   ArrayOverlap,
   Brackets,
   EntityManager,
   ILike,
-  In,
   LessThanOrEqual,
-  Like,
   MoreThanOrEqual,
-  Raw,
   Repository,
 } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -32,7 +28,7 @@ import { ParamInput } from 'src/common/dto/param.dto';
 import { Status } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { JwtService } from '@nestjs/jwt';
-import { SearchType } from 'src/search/dto/save-recent.dto';
+import { RecentSearch, SearchType } from 'src/search/dto/recent-search.dto';
 
 @Injectable()
 export class UsersService {
@@ -104,9 +100,46 @@ export class UsersService {
     return user;
   }
 
-  async findByEmail(email: string) {
-    const user = await this.usersRepository.findOne({ where: { email } });
-    return user || null; // 유저가 없으면 null 반환
+  async findByEmailOrNickname(EmailOrNickname: string) {
+    // 모든 필드를 가져오되, 역할에 따라 나중에 필드를 필터링
+    const user = await this.usersRepository.findOne({
+      where: EmailOrNickname.includes('@')
+        ? { email: EmailOrNickname }
+        : { nickname: EmailOrNickname },
+      select: {
+        id: true,
+        email: true,
+        nickname: true,
+        role: true,
+        photo: true,
+        pets: true, // 클라이언트만 사용하는 필드들
+        star: true, // 펫시터만 사용하는 필드들
+        reviewCount: true,
+        possibleDays: true,
+        possibleLocations: true,
+        possiblePetSpecies: true,
+        possibleStartTime: true,
+        possibleEndTime: true,
+        // 기타 공통 필드들
+      },
+    });
+
+    // 역할에 따라 필터링
+    if (user.role === UserRole.CLIENT) {
+      // 클라이언트일 경우 펫시터 전용 필드를 제거
+      delete user.star;
+      delete user.reviewCount;
+      delete user.possibleDays;
+      delete user.possibleLocations;
+      delete user.possiblePetSpecies;
+      delete user.possibleStartTime;
+      delete user.possibleEndTime;
+    } else if (user.role === UserRole.PETSITTER) {
+      // 펫시터일 경우 펫시터 전용 필드를 제거
+      delete user.pets;
+    }
+
+    return user;
   }
 
   async me(jwtUser: JwtUser) {
@@ -514,49 +547,44 @@ export class UsersService {
     }
   }
 
-  async updateRecentSearches(
-    userId: number,
-    searchTerm: { id: number },
-    type: SearchType,
-    action: 'add' | 'remove',
-  ) {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+  async saveRecentSearch(userId: number, saveRecentSearchInput: RecentSearch) {
+    const { id: searchId, type: searchType } = saveRecentSearchInput;
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'recentSearches'],
+    });
 
     if (!User) {
       throw new NotFoundException('No user found');
     }
+
     try {
       let updatedSearches = user.recentSearches || [];
 
-      if (type === SearchType.USER) {
-        if (action === 'add') {
-          console.log('add');
-          // 기존에 같은 검색어가 없으면 추가
-          if (
-            !updatedSearches.some(
-              (search) =>
-                search.id === searchTerm.id && search.type === SearchType.USER,
-            )
-          ) {
-            updatedSearches.push({
-              id: searchTerm.id,
-              type: SearchType.USER,
-              timestamp: Date.now(),
-            });
-          }
-
-          // 검색어가 5개 이상이면 가장 오래된 검색어 삭제
-          if (updatedSearches.length > 5) {
-            updatedSearches.sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
-            updatedSearches = updatedSearches.slice(0, 5); // 최신 5개만 남기기
-          }
-        } else if (action === 'remove') {
-          console.log('remove');
-          // 검색어가 있으면 제거
+      if (searchType === SearchType.USER) {
+        // 기존에 같은 검색어가 없으면 추가
+        if (
+          !updatedSearches.some(
+            (search) =>
+              search.id === searchId && search.type === SearchType.USER,
+          )
+        ) {
+          updatedSearches.push({
+            id: searchId,
+            type: SearchType.USER,
+            timestamp: Date.now(),
+          });
+        } else {
           updatedSearches = updatedSearches.filter(
             (search) =>
-              !(search.id === searchTerm.id && search.type === SearchType.USER),
+              !(search.id === searchId && search.type === SearchType.USER),
           );
+        }
+
+        // 검색어가 5개 이상이면 가장 오래된 검색어 삭제
+        if (updatedSearches.length > 5) {
+          updatedSearches.sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
+          updatedSearches = updatedSearches.slice(0, 5); // 최신 5개만 남기기
         }
       }
 
@@ -582,7 +610,7 @@ export class UsersService {
       user.recentSearches.map(async (search) => {
         if (search.type === SearchType.USER) {
           const result = await this.usersRepository.findOne({
-            where: { id: userId },
+            where: { id: search.id },
             select: ['id', 'nickname', 'photo'],
           });
 
@@ -592,5 +620,47 @@ export class UsersService {
     );
 
     return results;
+  }
+
+  async deleteRecentSearch(
+    userId: number,
+    deleteRecentSearchInput: RecentSearch,
+  ) {
+    const { id: searchId, type: searchType } = deleteRecentSearchInput;
+
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'recentSearches'],
+    });
+
+    if (!User) {
+      throw new NotFoundException('No user found');
+    }
+
+    try {
+      const updatedRecentSearches = user.recentSearches.filter(
+        (search) => !(search.id === searchId && search.type === searchType),
+      );
+
+      // 업데이트된 검색어 배열 저장
+      user.recentSearches = updatedRecentSearches;
+      await this.usersRepository.save(user);
+
+      return {
+        message: 'Successfully update recent searches',
+        recentSearches: updatedRecentSearches,
+      };
+    } catch (e) {
+      throw new InternalServerErrorException('Fail to delte recent search');
+    }
+  }
+
+  async findByEmailWithPassword(email: string) {
+    const user = await this.usersRepository.findOne({
+      where: { email },
+      select: ['id', 'email', 'role', 'password'],
+    });
+
+    return user;
   }
 }
