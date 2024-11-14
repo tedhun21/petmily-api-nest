@@ -114,7 +114,7 @@ export class ReservationsService {
         await this.reservationsRepository.findAndCount({
           where: whereCondition,
           order: orderCondition,
-          relations: ['client', 'petsitter'],
+          relations: ['client', 'petsitter', 'pets'],
           select: {
             client: { id: true, nickname: true, photo: true },
             petsitter: {
@@ -149,9 +149,14 @@ export class ReservationsService {
 
     const reservation = await this.reservationsRepository.findOne({
       where: { id: +reservationId },
-      relations: ['client', 'petsitter', 'journal', 'review'],
+      relations: ['client', 'petsitter', 'journal', 'review', 'pets'],
       select: {
-        client: { id: true, username: true, nickname: true, photo: true },
+        client: {
+          id: true,
+          username: true,
+          nickname: true,
+          photo: true,
+        },
         petsitter: {
           id: true,
           username: true,
@@ -244,20 +249,45 @@ export class ReservationsService {
     });
   }
 
-  async getReviewByReservation(jwtUser: JwtUser, params: ParamInput) {
+  async getReservationWithReview(jwtUser: JwtUser, param: ParamInput) {
     const { id: userId } = jwtUser;
-    const { id: reservationId } = params;
+    const { id: reservationId } = param;
 
     try {
       const reservation = await this.reservationsRepository.findOne({
         where: { id: +reservationId, client: { id: userId } },
         relations: ['review'],
-        select: { review: { id: true } },
+        select: { id: true },
       });
+
+      if (!reservation.review) {
+        throw new NotFoundException('No review found');
+      }
 
       return reservation.review;
     } catch (e) {
       throw new InternalServerErrorException('Fail to fetch review');
+    }
+  }
+
+  async getReservationWithJournal(jwtUser: JwtUser, param: ParamInput) {
+    const { id: userId } = jwtUser;
+    const { id: reservationId } = param;
+
+    try {
+      const reservation = await this.reservationsRepository.findOne({
+        where: { id: +reservationId, petsitter: { id: userId } },
+        relations: ['journal'],
+        select: { id: true },
+      });
+
+      if (!reservation.journal) {
+        throw new NotFoundException('No jounral found');
+      }
+
+      return reservation.journal;
+    } catch (e) {
+      throw new InternalServerErrorException('Fail to fetch journal');
     }
   }
 }

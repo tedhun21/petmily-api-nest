@@ -59,10 +59,19 @@ export class ReservationsController {
 
   @UseGuards(JwtAuthGuard)
   @Get(':id/review')
-  getReveiwByReservation(
+  getReservationWithReview(
     @AuthUser() jwtUser: JwtUser,
-    @Param() params: ParamInput,
+    @Param() param: ParamInput,
   ) {
-    return this.reservationsService.getReviewByReservation(jwtUser, params);
+    return this.reservationsService.getReservationWithReview(jwtUser, param);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/journal')
+  getReservationWithJournal(
+    @AuthUser() jwtUser: JwtUser,
+    @Param() param: ParamInput,
+  ) {
+    return this.reservationsService.getReservationWithJournal(jwtUser, param);
   }
 }

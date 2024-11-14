@@ -11,7 +11,7 @@ export class Journal extends CoreEntity {
 
   @Column('text', { array: true, nullable: true })
   @IsArray()
-  @IsString({ each: true }) // Validates each item in the array as a string
+  @IsString({ each: true })
   photos: string[];
 
   @OneToOne(() => Reservation, (reservation) => reservation.journal, {

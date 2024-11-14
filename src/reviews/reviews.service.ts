@@ -62,7 +62,7 @@ export class ReviewsService {
       );
     }
 
-    let photoUrls = null;
+    let photoUrls: string[] = [];
     if (files && files.length > 0) {
       photoUrls = await Promise.all(
         files.map(async (file) => await this.uploadsService.uploadFile(file)),
@@ -79,19 +79,27 @@ export class ReviewsService {
       });
 
       try {
-        // 1. 리뷰 생성
-        const newReview = await manager.save(review);
-        // 2. 펫시터 별점 업데이트
-        await this.usersService.updatePetsitterStar(
-          reservation.petsitter.id,
-          star,
-          manager,
-          true,
-        );
+        return await this.entityManager.transaction(async (manager) => {
+          // Create review entity with optional photos
+          const review = this.reviewsRepository.create({
+            ...createReviewInput,
+            reservation: { id: reservationId },
+            ...(photoUrls.length > 0 && { photos: photoUrls }),
+          });
 
-        return { id: newReview.id, message: 'Successfully create a review' };
+          // Save the new review and update petsitter's rating
+          const newReview = await manager.save(review);
+          await this.usersService.updatePetsitterStar(
+            reservation.petsitter.id,
+            star,
+            manager,
+            true,
+          );
+
+          return { id: newReview.id, message: 'Successfully created review' };
+        });
       } catch (e) {
-        throw new InternalServerErrorException('Fail to create a review');
+        throw new InternalServerErrorException('Failed to create a review');
       }
     });
   }

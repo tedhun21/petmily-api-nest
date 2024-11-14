@@ -133,6 +133,10 @@ export class JournalsService {
     const { id: userId } = jwtUser;
     const { id: journalId } = params;
     const { deleteFiles, body } = updateJournalInput;
+    console.log(
+      '🚀 ~ JournalsService ~ updateJournalInput:',
+      updateJournalInput,
+    );
 
     const journal = await this.journalsRepository.findOne({
       where: { id: +journalId },
@@ -149,6 +153,9 @@ export class JournalsService {
       );
     }
 
+    // journal.photos가 배열이 아니면 빈 배열로 초기화
+    journal.photos = journal.photos || [];
+
     if (deleteFiles && deleteFiles.length > 0) {
       await Promise.all(
         deleteFiles.map(
@@ -160,18 +167,21 @@ export class JournalsService {
       );
     }
 
-    let newPhotoUrls = null;
+    // newPhotoUrls를 항상 배열로 초기화
+    let newPhotoUrls: string[] = [];
     if (files && files.length > 0) {
       newPhotoUrls = await Promise.all(
         files.map(async (file) => await this.uploadsService.uploadFile(file)),
       );
     }
+
     journal.photos = [...journal.photos, ...newPhotoUrls];
 
     const updateJournalData = {
       ...journal,
       body,
     };
+
     try {
       const updatedJournal =
         await this.journalsRepository.save(updateJournalData);

@@ -65,7 +65,7 @@ export class Reservation extends CoreEntity {
   @ManyToOne(() => User, (user) => user.petsitterReservations)
   petsitter: User;
 
-  @ManyToMany(() => Pet, (pet) => pet.reservations, { eager: true })
+  @ManyToMany(() => Pet, (pet) => pet.reservations)
   @JoinTable()
   pets: Pet[];
 
