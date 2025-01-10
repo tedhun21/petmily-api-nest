@@ -12,7 +12,7 @@ import { Reservation } from './reservations/entity/reservation.entity';
 import { JournalsModule } from './journals/journals.module';
 import { Journal } from './journals/entity/journal.entity';
 import { ReviewsModule } from './reviews/reviews.module';
-import { Review } from './reviews/entity/reivew.entity';
+import { Review } from './reviews/entity/review.entity';
 import { ConnectModule } from './connect/connect.module';
 import { MailModule } from './mail/mail.module';
 import { Verification } from './users/entity/verification.entity';

@@ -29,6 +29,7 @@ export class UsersController {
   create(@Body() createUserInput: CreateUserInput) {
     return this.usersService.create(createUserInput);
   }
+
   @Get()
   findByEmailOrNickname(@Query('q') EmailOrNickname: string) {
     return this.usersService.findByEmailOrNickname(EmailOrNickname);
@@ -80,9 +81,11 @@ export class UsersController {
 
   @Get('petsitters/possible')
   findPossiblePetsitters(
-    @Query() findPossiblePetsittersIput: FindPossiblePetsittersInput,
+    @Query() findPossiblePetsittersInput: FindPossiblePetsittersInput,
   ) {
-    return this.usersService.findPossiblePetsitters(findPossiblePetsittersIput);
+    return this.usersService.findPossiblePetsitters(
+      findPossiblePetsittersInput,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -92,11 +95,6 @@ export class UsersController {
     @Query() pagination: PaginationInput,
   ) {
     return this.usersService.findUsedPetsitters(jwtUser, pagination);
-  }
-
-  @Get()
-  findPetsittersByNickname(@Body() findByNicknameInput: FindByNicknameInput) {
-    console.log(findByNicknameInput);
   }
 
   @Get('petsitters/star')

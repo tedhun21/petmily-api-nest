@@ -7,7 +7,13 @@ import {
 } from '@nestjs/common';
 import { CreateReservationInput } from './dto/create.reservation.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
-import { EntityManager, In, LessThan, MoreThan, Repository } from 'typeorm';
+import {
+  Between,
+  EntityManager,
+  LessThan,
+  MoreThan,
+  Repository,
+} from 'typeorm';
 import { Reservation, Status } from './entity/reservation.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UpdateReservationInput } from './dto/update.reservation.dto';
@@ -69,10 +75,12 @@ export class ReservationsService {
 
   async find(jwtUser: JwtUser, findReservationsInput: FindReservationsInput) {
     const { id: userId, role } = jwtUser;
-    const { order, status, page, pageSize } = findReservationsInput;
+    const { date, status, page, pageSize } = findReservationsInput;
 
-    let whereCondition = {} as any;
-    let orderCondition = {} as any;
+    console.log('date: ', date);
+
+    const whereCondition = {} as any;
+    // const dateCondition = {} as any;
 
     if (role) {
       if (role === UserRole.CLIENT) {
@@ -82,38 +90,41 @@ export class ReservationsService {
       }
     }
 
-    if (order) {
-      switch (order) {
-        case 'asc':
-          orderCondition.createdAt = 'asc';
-          break;
-        case 'desc':
-          orderCondition.createdAt = 'desc';
-          break;
-      }
+    if (date) {
+      const startDate = new Date(date);
+      const endDate = new Date(date);
+      endDate.setMonth(endDate.getMonth() + 1);
+
+      whereCondition.date = Between(startDate, endDate);
     }
 
     if (status) {
       switch (status) {
-        case 'expected':
-          whereCondition.status = In([Status.PENDING, Status.ACCEPTED]); // 대기중 및 진행중 상태
+        case Status.PENDING:
+          whereCondition.status = Status.PENDING;
           break;
-        case 'done':
-          whereCondition.status = In([Status.CANCELED, Status.COMPLETED]); // 취소 및 완료 상태
+        case Status.CANCELED:
+          whereCondition.status = Status.CANCELED;
           break;
-        case 'all':
+
+        case Status.ACCEPTED:
+          whereCondition.status = Status.ACCEPTED;
           break;
+
+        case Status.COMPLETED:
+          whereCondition.status = Status.COMPLETED;
+          break;
+
         default:
-          whereCondition.status = status;
           break;
       }
     }
+    console.log(whereCondition);
 
     try {
       const [reservations, total] =
         await this.reservationsRepository.findAndCount({
           where: whereCondition,
-          order: orderCondition,
           relations: ['client', 'petsitter', 'pets'],
           select: {
             client: { id: true, nickname: true, photo: true },
@@ -289,5 +300,26 @@ export class ReservationsService {
     } catch (e) {
       throw new InternalServerErrorException('Fail to fetch journal');
     }
+  }
+
+  async findByPetsitterForDay(param, query) {
+    const { id: petsitterId } = param;
+    const { date } = query;
+
+    const whereCondition = { petsitter: { id: petsitterId } } as any;
+
+    if (date) {
+      const targetDate = new Date(date);
+      targetDate.setHours(0, 0, 0, 0); // 날짜만 비교할 경우 시간 초기화
+
+      whereCondition.date = targetDate; // 같은 날짜로 조건 설정
+    }
+
+    const reservations = await this.reservationsRepository.find({
+      where: whereCondition,
+      select: ['id', 'date', 'startTime', 'endTime'],
+    });
+
+    return reservations;
   }
 }

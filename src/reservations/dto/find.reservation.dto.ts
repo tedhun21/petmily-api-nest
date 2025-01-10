@@ -2,6 +2,6 @@ import { PaginationInput } from 'src/common/dto/pagination.dto';
 import { Status } from '../entity/reservation.entity';
 
 export class FindReservationsInput extends PaginationInput {
-  status?: Status | 'all' | 'expected' | 'done';
-  order?: 'asc' | 'desc';
+  status?: Status | 'all';
+  date?: string;
 }

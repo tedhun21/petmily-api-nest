@@ -1,10 +1,26 @@
 services:
-  app:
+  app-dev:
     build:
-      context: . # Dockerfile이 위치한 디렉토리
-      dockerfile: Dockerfile # Dockerfile 이름
+      context: .
+      dockerfile: Dockerfile
+      target: development # 개발용 단계 선택
+    image: petmily-api:dev
+    container_name: petmily-dev-container
     ports:
-      - '8080:8080' # 컨테이너의 8080 포트를 로컬의 8080 포트에 매핑
+      - '8080:8080'
     env_file:
-      - '.env.prod' # .env.prod 파일에서 환경 변수 가져오기
-  #   environment:
+      - .env.dev
+    environment:
+      - DB_HOST=host.docker.internal # DB_HOST 덮어쓰기
+
+  app-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production # 프로덕션용 단계 선택
+    image: petmily-api:prod
+    container_name: petmily-prod-container
+    ports:
+      - '8080:8080'
+    env_file:
+      - .env.prod

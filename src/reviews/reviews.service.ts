@@ -10,7 +10,7 @@ import {
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { CreateReviewInput } from './dto/create.review.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Review } from './entity/reivew.entity';
+import { Review } from './entity/review.entity';
 import { EntityManager, IsNull, Not, Repository } from 'typeorm';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { ParamInput } from 'src/common/dto/param.dto';
@@ -116,11 +116,16 @@ export class ReviewsService {
       const [reviews, total] = await this.reviewsRepository.findAndCount({
         where: whereCondition,
         order: { createdAt: 'desc' },
-        relations: ['reservation.client'],
+        relations: [
+          'reservation.client',
+          'reservation.pets',
+          'reservation.petsitter',
+        ],
         select: {
           reservation: {
             id: true,
             client: { id: true, nickname: true, photo: true },
+            petsitter: { id: true, nickname: true, photo: true },
           },
         },
         take: +pageSize,
@@ -261,5 +266,40 @@ export class ReviewsService {
     } catch (e) {
       throw new InternalServerErrorException('Fail to delete thre review');
     }
+  }
+
+  async findByPetsitter(params, query) {
+    const { nickname } = params;
+    const { page, pageSize } = query;
+
+    const [reviews, total] = await this.reviewsRepository.findAndCount({
+      where: { reservation: { petsitter: { nickname } } },
+      relations: ['reservation', 'reservation.client'],
+      select: {
+        reservation: {
+          id: true,
+          client: {
+            id: true,
+            nickname: true,
+            photo: true,
+          },
+        },
+      },
+
+      skip: (+page - 1) * +pageSize,
+      take: +pageSize,
+    });
+
+    const totalPages = Math.ceil(total / +pageSize);
+
+    return {
+      results: reviews,
+      pagination: {
+        total,
+        totalPages,
+        page: +page,
+        pageSize: +pageSize,
+      },
+    };
   }
 }

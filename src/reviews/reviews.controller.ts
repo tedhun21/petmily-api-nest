@@ -65,4 +65,9 @@ export class ReviewsController {
   delete(@AuthUser() jwtUser: JwtUser, @Param() params: ParamInput) {
     return this.reviewsService.delete(jwtUser, params);
   }
+
+  @Get('petsitter/:nickname')
+  findByPetsitter(@Param() params, @Query() query) {
+    return this.reviewsService.findByPetsitter(params, query);
+  }
 }

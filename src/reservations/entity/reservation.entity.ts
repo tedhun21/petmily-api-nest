@@ -1,9 +1,9 @@
 import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsNumber, IsString } from 'class-validator';
+import { IsDate, IsEnum, IsString } from 'class-validator';
 import { CoreEntity } from 'src/common/entity/core.entity';
 import { Journal } from 'src/journals/entity/journal.entity';
 import { Pet } from 'src/pets/entity/pet.entity';
-import { Review } from 'src/reviews/entity/reivew.entity';
+import { Review } from 'src/reviews/entity/review.entity';
 import { User } from 'src/users/entity/user.entity';
 import {
   Column,

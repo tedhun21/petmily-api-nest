@@ -10,20 +10,13 @@ export class SearchService {
   async getSuggestions(query) {
     const { q, page, pageSize } = query;
 
-    const { results: nicknameResults } =
-      await this.usersService.findPetsittersByNickname(q, {
-        page: String(page),
-        pageSize: String(pageSize),
-      });
-
     // const { results: locationResults } =
     //   await this.usersService.findPetsittersByLocation(q, {
     //     page: String(page),
     //     pageSize: String(pageSize),
     //   });
 
-    const combinedResults = [...nicknameResults];
-    return { results: combinedResults, pagination: {} };
+    // return { results:, pagination: {} };
   }
 
   async saveRecentSearch(

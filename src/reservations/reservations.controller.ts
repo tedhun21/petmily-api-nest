@@ -74,4 +74,9 @@ export class ReservationsController {
   ) {
     return this.reservationsService.getReservationWithJournal(jwtUser, param);
   }
+
+  @Get('petsitter/:id')
+  findReservationForDay(@Param() param: ParamInput, @Query() query) {
+    return this.reservationsService.findByPetsitterForDay(param, query);
+  }
 }

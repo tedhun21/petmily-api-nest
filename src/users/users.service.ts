@@ -8,10 +8,8 @@ import {
 
 import {
   ArrayContains,
-  ArrayOverlap,
   Brackets,
   EntityManager,
-  ILike,
   LessThanOrEqual,
   MoreThanOrEqual,
   Repository,
@@ -145,7 +143,7 @@ export class UsersService {
   async me(jwtUser: JwtUser) {
     const { id: userId, role } = jwtUser;
 
-    let conditionalSelect: (keyof User)[] = [
+    const conditionalSelect: (keyof User)[] = [
       'id',
       'username',
       'email',
@@ -308,12 +306,18 @@ export class UsersService {
   async findPossiblePetsitters(
     findPossiblePetsittersIput: FindPossiblePetsittersInput,
   ) {
-    const { date, startTime, endTime, address, petSpecies, page, pageSize } =
+    const { location, date, startTime, endTime, page, pageSize } =
       findPossiblePetsittersIput;
+
     // 동적으로 where 조건을 생성
     const whereCondition: any = {
       role: 'Petsitter',
     };
+
+    if (location) {
+      // ArrayOverlap 여러개 중 하나라도 포함하는게 있으면
+      whereCondition.possibleLocations = ArrayContains([location]);
+    }
 
     if (date) {
       const formattedDay = new Date(date).toLocaleDateString('en', {
@@ -332,37 +336,34 @@ export class UsersService {
       whereCondition.possibleEndTime = MoreThanOrEqual(endTime);
     }
 
-    if (address) {
-      // ArrayOverlap 여러개 중 하나라도 포함하는게 있으면
-      whereCondition.possibleLocations = ArrayContains([address]);
-    }
-
-    if (typeof petSpecies === 'string') {
-      const formattedPetSpecies = JSON.parse(petSpecies);
-      // ArrayOverlap 여러개 중 하나라도 포함하는게 있으면
-      whereCondition.possiblePetSpecies = ArrayOverlap([
-        ...formattedPetSpecies,
-      ]);
-    }
+    // if (typeof petSpecies === 'string') {
+    //   const formattedPetSpecies = JSON.parse(petSpecies);
+    //   // ArrayOverlap 여러개 중 하나라도 포함하는게 있으면
+    //   whereCondition.possiblePetSpecies = ArrayOverlap([
+    //     ...formattedPetSpecies,
+    //   ]);
+    // }
 
     try {
       const [petsitters, total] = await this.usersRepository.findAndCount({
         where: whereCondition,
-        select: {
-          id: true,
-          nickname: true,
-          email: true,
-          role: true,
-          address: true,
-          possibleDays: true,
-          possibleLocations: true,
-          possiblePetSpecies: true,
-          possibleStartTime: true,
-          possibleEndTime: true,
-          reviewCount: true,
-          star: true,
-          body: true,
-        },
+        select: [
+          'id',
+          'nickname',
+          'email',
+          'photo',
+          'role',
+          'address',
+          'possibleDays',
+          'possibleLocations',
+          'possiblePetSpecies',
+          'possibleStartTime',
+          'possibleEndTime',
+          'reviewCount',
+          'star',
+          'body',
+        ],
+
         take: +pageSize,
         skip: (+page - 1) * +pageSize,
       });
@@ -398,34 +399,7 @@ export class UsersService {
     }
   }
 
-  // 펫시터 닉네임 포함하는 검색
-  // star, reviewCount 높은 순
-  async findPetsittersByNickname(query: string, pagination: PaginationInput) {
-    const { page, pageSize } = pagination;
-
-    // 펫시터 닉네임
-    const [petsitters, total] = await this.usersRepository.findAndCount({
-      order: { star: 'DESC', reviewCount: 'DESC' },
-      where: { role: UserRole.PETSITTER, nickname: ILike(`%${query}%`) }, // ILIKE로 부분 일치를 구현
-      select: ['id', 'nickname', 'role', 'photo'],
-      skip: (+page - 1) * +pageSize,
-      take: +pageSize,
-    });
-
-    const totalPages = Math.ceil(total / +pageSize);
-
-    return {
-      results: petsitters,
-      pagination: {
-        total,
-        totalPages,
-        page: +page,
-        pageSize: +pageSize,
-      },
-    };
-  }
-
-  // 위지 기반 펫시터 검색
+  // 위치 기반 펫시터 검색
   async findPetsittersByLocation(words: string, pagination: PaginationInput) {
     const { page, pageSize } = pagination;
 
