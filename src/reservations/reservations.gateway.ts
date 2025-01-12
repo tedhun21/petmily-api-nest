@@ -40,9 +40,17 @@ export class ReservationsGateWay {
       // token decode
       const decoded = await this.jwtService.verify(token);
 
+      await this.reservationsService.update(
+        decoded,
+        { id: reservationId },
+        { status: newStatus },
+      );
+
       this.server
         .to(reservationId.toString())
         .emit('listenStatus', { newStatus });
-    } catch (e) {}
+    } catch (e) {
+      console.error(e);
+    }
   }
 }
