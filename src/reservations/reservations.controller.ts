@@ -19,6 +19,7 @@ import { FindReservationsInput } from './dto/find.reservation.dto';
 @Controller('reservations')
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) {}
+
   @UseGuards(JwtAuthGuard)
   @Post()
   create(
@@ -35,6 +36,12 @@ export class ReservationsController {
     @Query() findReservationsInput: FindReservationsInput,
   ) {
     return this.reservationsService.find(jwtUser, findReservationsInput);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('month')
+  findMonthWithReservation(@AuthUser() jwtUser: JwtUser) {
+    return this.reservationsService.findMonthWithReservation(jwtUser);
   }
 
   @UseGuards(JwtAuthGuard)

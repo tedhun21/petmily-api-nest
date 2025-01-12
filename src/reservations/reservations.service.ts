@@ -119,7 +119,6 @@ export class ReservationsService {
           break;
       }
     }
-    console.log(whereCondition);
 
     try {
       const [reservations, total] =
@@ -321,5 +320,31 @@ export class ReservationsService {
     });
 
     return reservations;
+  }
+
+  async findMonthWithReservation(jwtUser: JwtUser) {
+    const { id, role } = jwtUser;
+
+    const roleColumn =
+      role === UserRole.CLIENT
+        ? 'clientId'
+        : role === UserRole.PETSITTER
+          ? 'petsitterId'
+          : null;
+
+    if (roleColumn) {
+      const reservations = await this.reservationsRepository
+        .createQueryBuilder('reservation')
+        .select(
+          'DISTINCT TO_CHAR(reservation.date, \'YYYY-MM\') AS "yearMonth"',
+        ) // 1. reservation.date 필드를 'YYYY-MM' 형식으로 변화하여, 예약이 발생한 연도-월 형식으로 가져옴. 2. 이 값을 yearMonth라는 별칭으로 반환하며, 별칭은 큰 따옴표로 감싸서 정확히 대소문자를 구분하게 처리. 3. DISTINCT는 중복된 연-월 값들을 제거하기 위해 사용.
+        .where(`reservation.${roleColumn} = :id`, { id }) // 역할에 맞는 예약 조회
+        .orderBy('"yearMonth"', 'DESC') // 내림차순. 최신순.  큰 따옴표로 감싸서 정확한 별칭 사용
+        .getRawMany(); // raw 데이터를 받아옴. 여러 행의 결과가 배열 형태로 반환
+
+      return reservations.map((row) => row.yearMonth); // 'yearMonth'로 접근
+    }
+
+    return 'Invalid role';
   }
 }
