@@ -2,7 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { UserRole } from 'src/users/entity/user.entity';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import { Message } from './entity/message.entity';
 import { ChatRoom } from './entity/chatRoom.entity';
 import { CreateChatRoomInput } from './dto/create-chatRoom.dto';
@@ -77,7 +77,7 @@ export class ChatsService {
     findMessageInput: FindMessageInput,
   ) {
     const { chatRoomId } = params;
-    const { opponentId, page, pageSize } = findMessageInput;
+    const { opponentId, cursor, pageSize } = findMessageInput;
 
     // chatRoom 유효성 검사
     const chatRoomExists = await this.chatRoomRepository.findOne({
@@ -102,14 +102,14 @@ export class ChatsService {
         pagination: {
           total: 0,
           totalPages: 0,
-          page: +page,
+          page: 1,
           pageSize: +pageSize,
         },
       };
     }
 
-    // 메시지 조회
-    const [messages, total] = await this.messagesRepository.findAndCount({
+    // 커서 기반으로 메시지 조회
+    const queryOptions: any = {
       where: { chatRoom: { id: +chatRoomId } },
       order: { createdAt: 'DESC' },
       relations: ['sender', 'chatRoom'],
@@ -117,24 +117,40 @@ export class ChatsService {
         id: true,
         content: true,
         createdAt: true,
-        updatedAt: true,
         sender: { id: true },
         chatRoom: { id: true },
       },
-      skip: (+page - 1) * +pageSize,
       take: +pageSize,
-    });
+    };
 
-    const totalPages = Math.ceil(total / +pageSize);
+    if (cursor) {
+      // cursor는 마지막 메시지의 id로 사용
+      const cursorMessage = await this.messagesRepository.findOne({
+        where: { id: +cursor, chatRoom: { id: +chatRoomId } },
+        select: ['id', 'createdAt'],
+      });
+
+      // 커서 이후의 메시지만 조회
+      queryOptions.where.createdAt = LessThan(cursorMessage.createdAt);
+    }
+
+    // 메시지 조회
+    const [messages, total] =
+      await this.messagesRepository.findAndCount(queryOptions);
+
+    // 커서가 있으면 다음 페이지가 존재하는지 확인
+    const hasNextPage = messages.length === +pageSize;
+
+    const pagination = {
+      total,
+      totalPages: Math.ceil(total / +pageSize),
+      nextCursor: messages.length > 0 ? messages[messages.length - 1].id : null,
+      hasNextPage,
+    };
 
     return {
-      results: messages.reverse(),
-      pagination: {
-        total,
-        totalPages,
-        page: +page,
-        pageSize: +pageSize,
-      },
+      results: messages,
+      pagination,
     };
   }
 

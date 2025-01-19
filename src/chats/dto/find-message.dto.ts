@@ -1,7 +1,5 @@
-import { PaginationInput } from 'src/common/dto/pagination.dto';
-
 export class FindMessageInput {
   opponentId: string;
-  page: string;
+  cursor?: string;
   pageSize: string;
 }

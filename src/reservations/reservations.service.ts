@@ -205,11 +205,8 @@ export class ReservationsService {
     updateReservationInput: UpdateReservationInput,
   ) {
     const { id: userId } = jwtUser;
-    console.log('🚀 ~ ReservationsService ~ userId:', userId);
     const { id: reservationId } = params;
-    console.log('🚀 ~ ReservationsService ~ reservationId:', reservationId);
     const { status } = updateReservationInput;
-    console.log('🚀 ~ ReservationsService ~ status:', status);
 
     const reservation = await this.reservationsRepository.findOne({
       where: { id: +reservationId },

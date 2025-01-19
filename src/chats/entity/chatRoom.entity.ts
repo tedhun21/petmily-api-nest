@@ -13,6 +13,6 @@ export class ChatRoom extends CoreEntity {
   @JoinColumn({ name: 'petsitterId' })
   petsitter: User;
 
-  @OneToMany(() => Message, (message) => message.chatRoom)
+  @OneToMany(() => Message, (chat) => chat.chatRoom)
   messages?: Message[];
 }
