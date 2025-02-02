@@ -27,6 +27,7 @@ import { Status } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { JwtService } from '@nestjs/jwt';
 import { RecentSearch, SearchType } from 'src/search/dto/recent-search.dto';
+import { UpdateFavoriteInput } from './dto/updateFavorite';
 
 @Injectable()
 export class UsersService {
@@ -118,6 +119,7 @@ export class UsersService {
         possiblePetSpecies: true,
         possibleStartTime: true,
         possibleEndTime: true,
+        favorites: true,
         // 기타 공통 필드들
       },
     });
@@ -143,28 +145,32 @@ export class UsersService {
   async me(jwtUser: JwtUser) {
     const { id: userId, role } = jwtUser;
 
-    const conditionalSelect: (keyof User)[] = [
-      'id',
-      'username',
-      'email',
-      'nickname',
-      'role',
-      'verified',
-      'address',
-      'detailAddress',
-      'phone',
-      'photo',
-      'body',
-    ];
+    let conditionalSelect: any = {
+      id: true,
+      username: true,
+      nickname: true,
+      email: true,
+      verified: true,
+      role: true,
+      address: true,
+      detailAddress: true,
+      photo: true,
+      provider: true,
+      pets: true,
+      recentSearches: true,
+    };
 
-    if (role === 'Petsitter') {
-      conditionalSelect.push(
-        'possibleDays',
-        'possiblePetSpecies',
-        'possibleStartTime',
-        'possibleEndTime',
-        'possibleLocations',
-      );
+    if (role === UserRole.PETSITTER) {
+      conditionalSelect = {
+        ...conditionalSelect,
+        possibleDays: true,
+        possiblePetSpecies: true,
+        possibleStartTime: true,
+        possibleEndTime: true,
+        possibleLocations: true,
+      };
+
+      delete conditionalSelect.pets;
     }
 
     const me = await this.usersRepository.findOne({
@@ -442,6 +448,57 @@ export class UsersService {
   }
 
   async findStarPetsitters() {}
+
+  async getFavorites(jwtUser: JwtUser) {
+    const { id: userId } = jwtUser;
+
+    const me = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: ['favorites'],
+      select: { favorites: { id: true, nickname: true, photo: true } },
+    });
+
+    return me.favorites;
+  }
+
+  async updateFavorite(
+    jwtUser: JwtUser,
+    updateFavoriteInput: UpdateFavoriteInput,
+  ) {
+    const { id: userId } = jwtUser;
+    const { opponentId, action } = updateFavoriteInput;
+
+    // 현재 사용자 가져오기 (favorites)
+    const me = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: ['favorites'],
+      select: {
+        id: true,
+        favorites: { id: true },
+      },
+    });
+
+    // 상대방 유저 존재 여부 확인 (count() 사용)
+    const userExists = await this.usersRepository.count({
+      where: { id: opponentId },
+    });
+    if (userExists === 0) {
+      throw new NotFoundException('User not found');
+    }
+
+    // favorites 배열에서 opponentId를 포함하는지 체크
+    const isFavorite = me.favorites.some((fav) => fav.id === opponentId);
+
+    if (action === 'favorite' && !isFavorite) {
+      me.favorites.push({ id: opponentId } as User); // 객체 참조 없이 ID만 추가
+    } else if (action === 'unfavorite' && isFavorite) {
+      me.favorites = me.favorites.filter((fav) => fav.id !== opponentId);
+    }
+
+    await this.usersRepository.save(me);
+
+    return { message: 'Successfully update favorite', favorite: action };
+  }
 
   async validateUserById(id: number) {
     const user = await this.usersRepository.findOne({

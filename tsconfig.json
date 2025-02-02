@@ -17,5 +17,11 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false
-  }
+  },
+  "assets": [
+    {
+      "from": "src/search/data/locations.json",
+      "to": "dist/search/data/locations.json"
+    }
+  ]
 }

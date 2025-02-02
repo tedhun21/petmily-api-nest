@@ -133,10 +133,6 @@ export class JournalsService {
     const { id: userId } = jwtUser;
     const { id: journalId } = params;
     const { deleteFiles, body } = updateJournalInput;
-    console.log(
-      '🚀 ~ JournalsService ~ updateJournalInput:',
-      updateJournalInput,
-    );
 
     const journal = await this.journalsRepository.findOne({
       where: { id: +journalId },

@@ -20,7 +20,7 @@ import { ParamInput } from 'src/common/dto/param.dto';
 import { PaginationInput } from 'src/common/dto/pagination.dto';
 import { FindPossiblePetsittersInput } from './dto/findPossible.petsitter.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { FindByNicknameInput } from './dto/findByNickname.petsitter.dto';
+import { UpdateFavoriteInput } from './dto/updateFavorite';
 
 @Controller('users')
 export class UsersController {
@@ -39,6 +39,21 @@ export class UsersController {
   @Get('me')
   me(@AuthUser() jwtUser: JwtUser) {
     return this.usersService.me(jwtUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/favorites')
+  getFavorites(@AuthUser() jwtUser: JwtUser) {
+    return this.usersService.getFavorites(jwtUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('me/favorites')
+  updateFavorite(
+    @AuthUser() jwtUser: JwtUser,
+    @Body() updateFavoriteInput: UpdateFavoriteInput,
+  ) {
+    return this.usersService.updateFavorite(jwtUser, updateFavoriteInput);
   }
 
   @Get(':id')

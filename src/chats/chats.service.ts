@@ -175,6 +175,10 @@ export class ChatsService {
       ],
     });
 
+    if (!chatRoom) {
+      throw new InternalServerErrorException('Chat room not found');
+    }
+
     try {
       let newMessage;
       if (user.role === UserRole.CLIENT) {

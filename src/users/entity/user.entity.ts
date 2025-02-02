@@ -157,7 +157,6 @@ export class User extends CoreEntity {
   @OneToMany(() => Reservation, (reservation) => reservation.petsitter)
   petsitterReservations: Reservation[];
 
-  // 좋아요 표시  for client
   @ManyToMany(() => User)
   @JoinTable({
     name: 'favorites', // 관계 테이블 이름
@@ -168,7 +167,7 @@ export class User extends CoreEntity {
 
   @Column('json', { default: [] })
   @IsArray()
-  recentSearches?: { id: number; type: SearchType; timestamp: number }[];
+  recentSearches: { id: number; type: SearchType; timestamp: number }[];
 
   @BeforeInsert()
   @BeforeUpdate()

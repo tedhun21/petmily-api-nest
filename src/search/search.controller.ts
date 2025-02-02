@@ -8,8 +8,8 @@ import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 export class SearchController {
   constructor(private readonly searchSerivce: SearchService) {}
   @Get()
-  getSuggestions(@Query() query) {
-    return this.searchSerivce.getSuggestions(query);
+  getLocations(@Query() query: { q: string; limit: string }) {
+    return this.searchSerivce.getLocations(query);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -111,13 +111,16 @@ export class PetsService {
       throw new NotFoundException('No pet found');
     }
 
-    let photoUrl = null;
+    let photoUrl = pet.photo;
+    // case 1: 현재 사진이 없는 상태, 새로운 사진 파일
     if (!pet.photo && file) {
       photoUrl = await this.uploadsService.uploadFile(file);
     } else if (pet.photo && file) {
+      // case 2: 현재 사진 있는 상태, 새로운 사진 파일
       await this.uploadsService.deleteFile({ url: pet.photo });
       photoUrl = await this.uploadsService.uploadFile(file);
     } else if (pet.photo && !file) {
+      // case 3: 사진 있는 상태에서 사진 지우기
       await this.uploadsService.deleteFile({ url: pet.photo });
       photoUrl = null;
     }
@@ -125,7 +128,7 @@ export class PetsService {
     const updateData = {
       ...pet,
       ...updatePetInput,
-      ...(photoUrl && { photo: photoUrl }),
+      photo: photoUrl,
     };
 
     try {

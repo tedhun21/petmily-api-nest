@@ -1,22 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
-import { RecentSearch, SearchType } from './dto/recent-search.dto';
+import { RecentSearch } from './dto/recent-search.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class SearchService {
-  constructor(private readonly usersService: UsersService) {}
+  private locations: string[];
 
-  async getSuggestions(query) {
-    const { q, page, pageSize } = query;
+  constructor(private readonly usersService: UsersService) {
+    // location.json 파일 경로
+    const filePath = path.join(
+      process.cwd(),
+      process.env.NODE_ENV === 'dev' ? 'src' : 'dist',
+      'search',
+      'data',
+      'locations.json',
+    );
 
-    // const { results: locationResults } =
-    //   await this.usersService.findPetsittersByLocation(q, {
-    //     page: String(page),
-    //     pageSize: String(pageSize),
-    //   });
+    this.locations = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  }
 
-    // return { results:, pagination: {} };
+  async getLocations(query) {
+    const { q, limit } = query;
+
+    const filtedLocations = this.locations
+      .filter((location) => location.includes(q))
+      .slice(0, limit);
+
+    return filtedLocations;
   }
 
   async saveRecentSearch(
