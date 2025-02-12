@@ -6,14 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import {
-  ArrayContains,
-  Brackets,
-  EntityManager,
-  LessThanOrEqual,
-  MoreThanOrEqual,
-  Repository,
-} from 'typeorm';
+import { Brackets, EntityManager, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User, UserRole } from './entity/user.entity';
 import { CreateUserInput } from './dto/create.user.dto';
@@ -26,8 +19,10 @@ import { ParamInput } from 'src/common/dto/param.dto';
 import { Status } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { JwtService } from '@nestjs/jwt';
-import { RecentSearch, SearchType } from 'src/search/dto/recent-search.dto';
-import { UpdateFavoriteInput } from './dto/updateFavorite';
+import { UpdateFavoriteInput } from './dto/updateFavorite.user';
+import { RecentSearchInput } from './dto/updateRecent.user';
+import { RedisService } from 'src/redis/redis.service';
+import { isValidLocation } from 'src/common/location/location.utils';
 
 @Injectable()
 export class UsersService {
@@ -37,6 +32,7 @@ export class UsersService {
     private readonly reservationsService: ReservationsService,
     private readonly uploadsService: UploadsService,
     private readonly jwtService: JwtService,
+    private readonly redisService: RedisService,
   ) {}
 
   async create(createUserInput: CreateUserInput) {
@@ -315,14 +311,28 @@ export class UsersService {
     const { location, date, startTime, endTime, page, pageSize } =
       findPossiblePetsittersIput;
 
-    // 동적으로 where 조건을 생성
-    const whereCondition: any = {
-      role: 'Petsitter',
-    };
+    // 동적 조건
+    const queryBuilder = this.usersRepository
+      .createQueryBuilder('user')
+      .where('user.role = :role', { role: 'Petsitter' });
 
     if (location) {
-      // ArrayOverlap 여러개 중 하나라도 포함하는게 있으면
-      whereCondition.possibleLocations = ArrayContains([location]);
+      // 요소 부분 일치
+      queryBuilder.andWhere(
+        "ARRAY_TO_STRING(user.possibleLocations, ',') ILIKE :location",
+        { location: `%${location}%` },
+      );
+
+      // Redis 위치 검색 카운트 증가 (안전 처리)
+      if (isValidLocation(location)) {
+        try {
+          if (this.redisService.getClient().status === 'ready') {
+            this.redisService.incrementLocationCount(location);
+          }
+        } catch (error) {
+          console.error('❌ Redis 위치 카운트 증가 실패:', error);
+        }
+      }
     }
 
     if (date) {
@@ -330,61 +340,47 @@ export class UsersService {
         weekday: 'short',
       });
 
-      // 포함하는거 일치하는거 하나
-      whereCondition.possibleDays = ArrayContains([formattedDay]);
+      queryBuilder.andWhere(':formattedDay = ANY(user.possibleDays)', {
+        formattedDay,
+      });
     }
 
     if (startTime) {
-      whereCondition.possibleStartTime = LessThanOrEqual(startTime);
+      queryBuilder.andWhere('user.possibleStartTime <= :startTime', {
+        startTime,
+      });
     }
 
     if (endTime) {
-      whereCondition.possibleEndTime = MoreThanOrEqual(endTime);
+      queryBuilder.andWhere('user.possibleEndTime >= :endTime', { endTime });
     }
 
-    // if (typeof petSpecies === 'string') {
-    //   const formattedPetSpecies = JSON.parse(petSpecies);
-    //   // ArrayOverlap 여러개 중 하나라도 포함하는게 있으면
-    //   whereCondition.possiblePetSpecies = ArrayOverlap([
-    //     ...formattedPetSpecies,
-    //   ]);
-    // }
+    const [petsitters, total] = await queryBuilder
+      .select([
+        'user.id',
+        'user.nickname',
+        'user.photo',
+        'user.role',
+        'user.address',
+        'user.body',
+        'user.possibleDays',
+        'user.possibleLocations',
+        'user.possiblePetSpecies',
+        'user.possibleStartTime',
+        'user.possibleEndTime',
+        'user.reviewCount',
+        'user.star',
+      ])
+      .take(+pageSize)
+      .skip((+page - 1) & +pageSize)
+      .getManyAndCount();
 
-    try {
-      const [petsitters, total] = await this.usersRepository.findAndCount({
-        where: whereCondition,
-        select: [
-          'id',
-          'nickname',
-          'email',
-          'photo',
-          'role',
-          'address',
-          'possibleDays',
-          'possibleLocations',
-          'possiblePetSpecies',
-          'possibleStartTime',
-          'possibleEndTime',
-          'reviewCount',
-          'star',
-          'body',
-        ],
+    const totalPages = Math.ceil(total / +pageSize);
 
-        take: +pageSize,
-        skip: (+page - 1) * +pageSize,
-      });
-
-      const totalPages = Math.ceil(total / +pageSize);
-
-      return {
-        results: petsitters,
-        pagination: { total, totalPages, page: +page, pageSize: +pageSize },
-      };
-    } catch (e) {
-      throw new InternalServerErrorException(
-        'Fail to fetch possible petsitters',
-      );
-    }
+    return {
+      results: petsitters,
+      pagination: { total, totalPages, page: +page, pageSize: +pageSize },
+    };
   }
 
   async findUsedPetsitters(jwtUser: JwtUser, pagination: PaginationInput) {
@@ -500,19 +496,6 @@ export class UsersService {
     return { message: 'Successfully update favorite', favorite: action };
   }
 
-  async validateUserById(id: number) {
-    const user = await this.usersRepository.findOne({
-      where: { id },
-      select: ['id', 'role'],
-    });
-
-    if (!user) {
-      throw new NotFoundException('No user found with this ID');
-    }
-
-    return user;
-  }
-
   // 리뷰 생성과 Transaction
   async updatePetsitterStar(
     petsitterId: number,
@@ -578,112 +561,107 @@ export class UsersService {
     }
   }
 
-  async saveRecentSearch(userId: number, saveRecentSearchInput: RecentSearch) {
-    const { id: searchId, type: searchType } = saveRecentSearchInput;
-    const user = await this.usersRepository.findOne({
+  async updateRecentSearch(
+    jwtUser: JwtUser,
+    recentSearchInput: RecentSearchInput,
+  ) {
+    const { id: userId } = jwtUser;
+    const {
+      id: searchId,
+      name: searchName,
+      type: searchType,
+    } = recentSearchInput;
+
+    const me = await this.usersRepository.findOne({
       where: { id: userId },
       select: ['id', 'recentSearches'],
     });
 
-    if (!User) {
+    if (!me) {
       throw new NotFoundException('No user found');
     }
 
     try {
-      let updatedSearches = user.recentSearches || [];
+      let currentSearches = Array.isArray(me.recentSearches)
+        ? [...me.recentSearches]
+        : [];
 
-      if (searchType === SearchType.USER) {
-        // 기존에 같은 검색어가 없으면 추가
-        if (
-          !updatedSearches.some(
-            (search) =>
-              search.id === searchId && search.type === SearchType.USER,
-          )
-        ) {
-          updatedSearches.push({
-            id: searchId,
-            type: SearchType.USER,
-            timestamp: Date.now(),
-          });
-        } else {
-          updatedSearches = updatedSearches.filter(
-            (search) =>
-              !(search.id === searchId && search.type === SearchType.USER),
-          );
-        }
+      // 기존 검색어 삭제 (같은 검색어가 있으면 제거)
+      currentSearches = currentSearches.filter(
+        (search) => !(search.type === searchType && search.name === searchName),
+      );
 
-        // 검색어가 5개 이상이면 가장 오래된 검색어 삭제
-        if (updatedSearches.length > 5) {
-          updatedSearches.sort((a, b) => b.timestamp - a.timestamp); // 최신 순으로 정렬
-          updatedSearches = updatedSearches.slice(0, 5); // 최신 5개만 남기기
-        }
-      }
+      // 최신 검색어 추가
+      const newSearch: any = {
+        id: searchId || Date.now(),
+        name: searchName,
+        type: searchType,
+      };
+
+      // 최신 검색어 추가 (무조건 추가)
+      currentSearches.unshift(newSearch);
 
       // 업데이트된 검색어 배열 저장
-      user.recentSearches = updatedSearches;
-      await this.usersRepository.save(user);
+      me.recentSearches = currentSearches;
+      await this.usersRepository.save(me);
+
       return {
-        message: 'Successfully update recent searches',
-        recentSearches: updatedSearches,
+        message: 'Successfully updated recent searches',
       };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to save recent searches');
+      throw new InternalServerErrorException('Failed to save recent searches');
     }
-  }
-
-  async findRecentSearches(userId: number) {
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-      select: ['recentSearches'],
-    });
-
-    const results = await Promise.all(
-      user.recentSearches.map(async (search) => {
-        if (search.type === SearchType.USER) {
-          const result = await this.usersRepository.findOne({
-            where: { id: search.id },
-            select: ['id', 'nickname', 'photo'],
-          });
-
-          return { ...result, type: search.type };
-        }
-      }),
-    );
-
-    return results;
   }
 
   async deleteRecentSearch(
-    userId: number,
-    deleteRecentSearchInput: RecentSearch,
+    jwtUser: JwtUser,
+    recentSearchInput: RecentSearchInput,
   ) {
-    const { id: searchId, type: searchType } = deleteRecentSearchInput;
+    const { id: userId } = jwtUser;
+    const { name: searchName, type: searchType } = recentSearchInput;
 
-    const user = await this.usersRepository.findOne({
+    const me = await this.usersRepository.findOne({
       where: { id: userId },
       select: ['id', 'recentSearches'],
     });
 
-    if (!User) {
+    if (!me) {
       throw new NotFoundException('No user found');
     }
 
     try {
-      const updatedRecentSearches = user.recentSearches.filter(
-        (search) => !(search.id === searchId && search.type === searchType),
+      let currentSearches = Array.isArray(me.recentSearches)
+        ? [...me.recentSearches]
+        : [];
+
+      currentSearches = currentSearches.filter(
+        (search) => search.type === searchType && search.name === searchName,
       );
 
-      // 업데이트된 검색어 배열 저장
-      user.recentSearches = updatedRecentSearches;
-      await this.usersRepository.save(user);
+      me.recentSearches = currentSearches;
+      await this.usersRepository.save(me);
 
       return {
-        message: 'Successfully update recent searches',
-        recentSearches: updatedRecentSearches,
+        message: 'Successfully delete recentsearches',
       };
     } catch (e) {
-      throw new InternalServerErrorException('Fail to delte recent search');
+      throw new InternalServerErrorException(
+        'Failed to delete recent searches',
+      );
     }
+  }
+
+  async validateUserById(id: number) {
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      select: ['id', 'role'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('No user found with this ID');
+    }
+
+    return user;
   }
 
   async findByEmailWithPassword(email: string) {

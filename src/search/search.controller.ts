@@ -1,41 +1,21 @@
-import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { SearchService } from './search.service';
-import { RecentSearch } from './dto/recent-search.dto';
-import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
-import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 
 @Controller('search')
 export class SearchController {
   constructor(private readonly searchSerivce: SearchService) {}
+
   @Get()
-  getLocations(@Query() query: { q: string; limit: string }) {
-    return this.searchSerivce.getLocations(query);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Put('recent')
-  saveRecentSearch(
-    @AuthUser() jwtUser: JwtUser,
-    @Body() SaveRecentSearchInput: RecentSearch,
+  searchData(
+    @Query('index') index: string,
+    @Query('query') query: string,
+    @Query('size') size?: string,
   ) {
-    return this.searchSerivce.saveRecentSearch(jwtUser, SaveRecentSearchInput);
+    return this.searchSerivce.searchData(index, query, size);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Get('recent')
-  findRecentSearches(@AuthUser() jwtUser: JwtUser) {
-    return this.searchSerivce.findRecentSearches(jwtUser);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Put('recent/delete')
-  deleteRecentSearch(
-    @AuthUser() jwtUser: JwtUser,
-    @Body() deleteRecentSearchInput: RecentSearch,
-  ) {
-    return this.searchSerivce.deleteRecentSearch(
-      jwtUser,
-      deleteRecentSearchInput,
-    );
+  @Get('location-count')
+  loctionByCount(@Query('size') size: string) {
+    return this.searchSerivce.locationByCount(size);
   }
 }

@@ -24,7 +24,7 @@ import {
 } from 'class-validator';
 import { Pet, Species } from 'src/pets/entity/pet.entity';
 import { Reservation } from 'src/reservations/entity/reservation.entity';
-import { SearchType } from 'src/search/dto/recent-search.dto';
+import { SearchType } from '../dto/updateRecent.user';
 
 export enum UserRole {
   USER = 'User',
@@ -167,7 +167,12 @@ export class User extends CoreEntity {
 
   @Column('json', { default: [] })
   @IsArray()
-  recentSearches: { id: number; type: SearchType; timestamp: number }[];
+  recentSearches: {
+    id?: number;
+    name: string;
+    type: SearchType;
+    timestamp: number;
+  }[];
 
   @BeforeInsert()
   @BeforeUpdate()

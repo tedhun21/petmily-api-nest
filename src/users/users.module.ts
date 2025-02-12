@@ -8,6 +8,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ReservationsModule } from 'src/reservations/reservations.module';
 import { Verification } from './entity/verification.entity';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { Verification } from './entity/verification.entity';
     }),
     ReservationsModule,
     UploadsModule,
+    RedisModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

@@ -21,6 +21,8 @@ import { ChatRoom } from './chats/entity/chatRoom.entity';
 import { Message } from './chats/entity/message.entity';
 import { MapsModule } from './maps/maps.module';
 import { SearchModule } from './search/search.module';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -48,6 +50,13 @@ import { SearchModule } from './search/search.module';
       ],
       synchronize: true,
     }),
+    ClientsModule.register([
+      {
+        name: 'SEARCT_SERVICE',
+        transport: Transport.REDIS,
+        options: { host: 'localhost', port: 6379 },
+      },
+    ]),
     UsersModule,
     AuthModule,
     PetsModule,
@@ -60,6 +69,7 @@ import { SearchModule } from './search/search.module';
     ChatsModule,
     MapsModule,
     SearchModule,
+    RedisModule,
   ],
   controllers: [],
   providers: [],
