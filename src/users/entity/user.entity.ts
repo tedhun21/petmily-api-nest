@@ -24,7 +24,8 @@ import {
 } from 'class-validator';
 import { Pet, Species } from 'src/pets/entity/pet.entity';
 import { Reservation } from 'src/reservations/entity/reservation.entity';
-import { SearchType } from '../dto/updateRecent.user';
+import { ChatMember } from 'src/chats/entity/chatMember.entity';
+// import { SearchType } from '../dto/updateRecent.user';
 
 export enum UserRole {
   USER = 'User',
@@ -165,14 +166,8 @@ export class User extends CoreEntity {
   })
   favorites: User[];
 
-  @Column('json', { default: [] })
-  @IsArray()
-  recentSearches: {
-    id?: number;
-    name: string;
-    type: SearchType;
-    timestamp: number;
-  }[];
+  @OneToMany(() => ChatMember, (chatMember) => chatMember.user)
+  chatMembers: ChatMember[];
 
   @BeforeInsert()
   @BeforeUpdate()

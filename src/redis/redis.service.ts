@@ -13,13 +13,13 @@ export class RedisService implements OnModuleInit {
       port: 6379, // Redis 서버 포트
       db: 0, // 사용하는 데이터베이스 인덱스,
 
-      // ❗ 5초 동안만 재시도 후 포기
+      // ❗ 3초 동안만 재시도 후 포기
       retryStrategy(times) {
-        if (times >= 5) {
+        if (times >= 3) {
           console.error('❌ Giving up on Redis reconnect.');
           return undefined; // 기본 재시도 로직 사용
         }
-        console.warn(`⚠️ Attempting Redis reconnect... (${times}/5)`);
+        console.warn(`⚠️ Attempting Redis reconnect... (${times}/3)`);
         return 1000; // 1초 후 재시도
       },
     });
@@ -93,7 +93,7 @@ export class RedisService implements OnModuleInit {
       return null;
     }
   }
-  // 특정 지역의 카운트 조회 (index: location:count => ZSET)
+  // 특정 지역의 카운트 조회 (index === location:count => ZSET 자료구조)
   async getLocationCount(key: string) {
     const count = await this.redisClient.zscore('location:count', key);
     return count;
@@ -126,5 +126,37 @@ export class RedisService implements OnModuleInit {
 
     console.log(`${location}의 count:`, result);
     return parseFloat(result);
+  }
+
+  // 유저가 속한 모든 채팅방의 undreadCount 가져오기 (zset(sorted set) 구조로 count 값이 있는 것만 가져오기)
+  async getUserAllUnreadCounts(userId: number) {
+    const key = `user:${userId}:unreadRooms`;
+
+    // zrangebyscore로 unreadCount가 있는 채팅방만 가져오기 (score > 0)
+    const unreadChatRooms = await this.redisClient.zrangebyscore(
+      key,
+      1,
+      '+inf',
+    );
+    return unreadChatRooms;
+  }
+
+  // 유저의 채팅방에 대한 unreadCount 증가
+  async incrementUserUnreadCount(
+    userId: number,
+    chatRoomId: string,
+    count: number = 1,
+  ) {
+    const key = `user:${userId}:unreadRooms`;
+
+    await this.redisClient.zincrby(key, count, chatRoomId);
+  }
+
+  // 유저의 채팅방에서 unreadCount 삭제
+  async deleteUserUnreadCount(userId: string, chatRoomId: string) {
+    const key = `user:${userId}:chatRoom:${chatRoomId}:unreadCount`;
+
+    // 해당 유저의 unreadCount 키 삭제
+    await this.redisClient.del(key);
   }
 }

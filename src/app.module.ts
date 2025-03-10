@@ -23,6 +23,7 @@ import { MapsModule } from './maps/maps.module';
 import { SearchModule } from './search/search.module';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { RedisModule } from './redis/redis.module';
+import { ChatMember } from './chats/entity/chatMember.entity';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { RedisModule } from './redis/redis.module';
         Verification,
         ChatRoom,
         Message,
+        ChatMember,
       ],
       synchronize: true,
     }),

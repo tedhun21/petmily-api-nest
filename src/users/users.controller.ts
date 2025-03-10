@@ -21,7 +21,7 @@ import { PaginationInput } from 'src/common/dto/pagination.dto';
 import { FindPossiblePetsittersInput } from './dto/findPossible.petsitter.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UpdateFavoriteInput } from './dto/updateFavorite.user';
-import { RecentSearchInput } from './dto/updateRecent.user';
+// import { RecentSearchInput } from './dto/updateRecent.user';
 
 @Controller('users')
 export class UsersController {
@@ -34,6 +34,13 @@ export class UsersController {
   @Get()
   findByEmailOrNickname(@Query('q') EmailOrNickname: string) {
     return this.usersService.findByEmailOrNickname(EmailOrNickname);
+  }
+
+  @Get('by-ids')
+  findByIds(@Query('ids') ids: string) {
+    const arrayIds = ids.split(',').map((id) => Number(id));
+
+    return this.usersService.findByIds(arrayIds);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -55,29 +62,6 @@ export class UsersController {
     @Body() updateFavoriteInput: UpdateFavoriteInput,
   ) {
     return this.usersService.updateFavorite(jwtUser, updateFavoriteInput);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Put('me/recent')
-  updateRecent(
-    @AuthUser() jwtUser: JwtUser,
-    @Body() recentSearchInput: RecentSearchInput,
-  ) {
-    return this.usersService.updateRecentSearch(jwtUser, recentSearchInput);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Delete('me/recent')
-  deleteRecent(
-    @AuthUser() jwtUser: JwtUser,
-    @Body() recentSearchInput: RecentSearchInput,
-  ) {
-    return this.usersService.deleteRecentSearch(jwtUser, recentSearchInput);
-  }
-
-  @Get(':id')
-  findById(@Param() params: ParamInput) {
-    return this.usersService.findById(params);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { Brackets, EntityManager, Repository } from 'typeorm';
+import { Brackets, EntityManager, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User, UserRole } from './entity/user.entity';
 import { CreateUserInput } from './dto/create.user.dto';
@@ -20,7 +20,7 @@ import { Status } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { JwtService } from '@nestjs/jwt';
 import { UpdateFavoriteInput } from './dto/updateFavorite.user';
-import { RecentSearchInput } from './dto/updateRecent.user';
+// import { RecentSearchInput } from './dto/updateRecent.user';
 import { RedisService } from 'src/redis/redis.service';
 import { isValidLocation } from 'src/common/location/location.utils';
 
@@ -80,19 +80,13 @@ export class UsersService {
     }
   }
 
-  async findById(params: ParamInput) {
-    const { id } = params;
-
-    const user = await this.usersRepository.findOne({
-      where: { id: +id },
-      select: ['id', 'nickname', 'body', 'photo', 'role'],
+  async findByIds(ids: number[]) {
+    const users = await this.usersRepository.find({
+      where: { id: In(ids) },
+      select: ['id', 'nickname', 'photo', 'role'],
     });
 
-    if (!user) {
-      throw new NotFoundException('No user found');
-    }
-
-    return user;
+    return users;
   }
 
   async findByEmailOrNickname(EmailOrNickname: string) {
@@ -153,7 +147,6 @@ export class UsersService {
       photo: true,
       provider: true,
       pets: true,
-      recentSearches: true,
     };
 
     if (role === UserRole.PETSITTER) {
@@ -557,96 +550,6 @@ export class UsersService {
     } catch (e) {
       throw new InternalServerErrorException(
         'Fail to update petsitter completed',
-      );
-    }
-  }
-
-  async updateRecentSearch(
-    jwtUser: JwtUser,
-    recentSearchInput: RecentSearchInput,
-  ) {
-    const { id: userId } = jwtUser;
-    const {
-      id: searchId,
-      name: searchName,
-      type: searchType,
-    } = recentSearchInput;
-
-    const me = await this.usersRepository.findOne({
-      where: { id: userId },
-      select: ['id', 'recentSearches'],
-    });
-
-    if (!me) {
-      throw new NotFoundException('No user found');
-    }
-
-    try {
-      let currentSearches = Array.isArray(me.recentSearches)
-        ? [...me.recentSearches]
-        : [];
-
-      // 기존 검색어 삭제 (같은 검색어가 있으면 제거)
-      currentSearches = currentSearches.filter(
-        (search) => !(search.type === searchType && search.name === searchName),
-      );
-
-      // 최신 검색어 추가
-      const newSearch: any = {
-        id: searchId || Date.now(),
-        name: searchName,
-        type: searchType,
-      };
-
-      // 최신 검색어 추가 (무조건 추가)
-      currentSearches.unshift(newSearch);
-
-      // 업데이트된 검색어 배열 저장
-      me.recentSearches = currentSearches;
-      await this.usersRepository.save(me);
-
-      return {
-        message: 'Successfully updated recent searches',
-      };
-    } catch (e) {
-      throw new InternalServerErrorException('Failed to save recent searches');
-    }
-  }
-
-  async deleteRecentSearch(
-    jwtUser: JwtUser,
-    recentSearchInput: RecentSearchInput,
-  ) {
-    const { id: userId } = jwtUser;
-    const { name: searchName, type: searchType } = recentSearchInput;
-
-    const me = await this.usersRepository.findOne({
-      where: { id: userId },
-      select: ['id', 'recentSearches'],
-    });
-
-    if (!me) {
-      throw new NotFoundException('No user found');
-    }
-
-    try {
-      let currentSearches = Array.isArray(me.recentSearches)
-        ? [...me.recentSearches]
-        : [];
-
-      currentSearches = currentSearches.filter(
-        (search) => search.type === searchType && search.name === searchName,
-      );
-
-      me.recentSearches = currentSearches;
-      await this.usersRepository.save(me);
-
-      return {
-        message: 'Successfully delete recentsearches',
-      };
-    } catch (e) {
-      throw new InternalServerErrorException(
-        'Failed to delete recent searches',
       );
     }
   }

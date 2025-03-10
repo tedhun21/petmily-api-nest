@@ -8,10 +8,12 @@ import { ChatRoom } from './entity/chatRoom.entity';
 import { Message } from './entity/message.entity';
 import { ChatsService } from './chats.service';
 import { ChatsController } from './chats.controller';
+import { RedisModule } from 'src/redis/redis.module';
+import { ChatMember } from './entity/chatMember.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ChatRoom, Message]),
+    TypeOrmModule.forFeature([ChatRoom, Message, ChatMember]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -21,6 +23,7 @@ import { ChatsController } from './chats.controller';
       inject: [ConfigService],
     }),
     UsersModule,
+    RedisModule,
   ],
   providers: [ChatsGateWay, ChatsService],
   controllers: [ChatsController],

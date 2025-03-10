@@ -4,47 +4,97 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
-import { FindChatRoomInput } from './dto/find-chatRoom.dto';
 import { ChatsService } from './chats.service';
-import { CreateChatRoomInput } from './dto/create-chatRoom.dto';
-import { FindMessageInput } from './dto/find-message.dto';
+import { GetMessagesInput } from './dto/get-message.dto';
+import { GetChatRoomsInput } from './dto/get-chatRooms.dto';
+import { UpdateUnreadCount } from './dto/update-unreadCount';
 
 @Controller('chats')
 export class ChatsController {
   constructor(private readonly chatsService: ChatsService) {}
-  @Get()
+
   @UseGuards(JwtAuthGuard)
-  findChatRoom(
+  @Get()
+  getChatRooms(
     @AuthUser() jwtUser: JwtUser,
-    @Query() findChatRoomInput: FindChatRoomInput,
+    @Query() getChatRoomsInput: GetChatRoomsInput,
   ) {
-    return this.chatsService.findChatRoomByUsers(
+    return this.chatsService.getChatRooms(jwtUser, getChatRoomsInput);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('by-users')
+  getChatRoomByUsers(
+    @AuthUser() jwtUser: JwtUser,
+    @Query('opponentIds') opponentIds: string,
+  ) {
+    const arrayIds = opponentIds.split(',').map((id) => Number(id));
+
+    return this.chatsService.getChatRoomByUsers(jwtUser, arrayIds);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('unread')
+  updateUnreadCount(
+    @AuthUser() jwtUser: JwtUser,
+    @Query() updateUnreadCountQuery,
+    @Body() updateUnreadCount: UpdateUnreadCount,
+  ) {
+    return this.chatsService.updateUnreadCount(
       jwtUser,
-      findChatRoomInput.opponentId,
+      updateUnreadCountQuery,
+      updateUnreadCount,
     );
   }
 
-  @Post()
   @UseGuards(JwtAuthGuard)
+  @Post()
   createChatRoom(
     @AuthUser() jwtUser: JwtUser,
-    @Body() createChatRoomInput: CreateChatRoomInput,
+    @Body() createChatRoomInput: { opponentIds: number[] },
   ) {
-    return this.chatsService.createChatRoom(jwtUser, createChatRoomInput);
+    const { opponentIds } = createChatRoomInput;
+    const arrayIds = opponentIds.map((id) => Number(id));
+
+    return this.chatsService.createChatRoom(jwtUser, arrayIds);
   }
 
-  @Get(':chatRoomId/messages')
   @UseGuards(JwtAuthGuard)
-  findMessages(
+  @Get(':chatRoomId')
+  getChatRoom(
+    @AuthUser() jwtUser: JwtUser,
+    @Param() param: { chatRoomId: string },
+  ) {
+    return this.chatsService.getChatRoom(jwtUser, param);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':chatRoomId/messages')
+  getMessages(
     @AuthUser() jwtUser: JwtUser,
     @Param() params: { chatRoomId: string },
-    @Query() findMessageInput: FindMessageInput,
+    @Query() getMessagesInput: GetMessagesInput,
   ) {
-    return this.chatsService.findMessages(jwtUser, params, findMessageInput);
+    return this.chatsService.getMessages(jwtUser, params, getMessagesInput);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':chatRoomId/messages')
+  createMessage(
+    @AuthUser() jwtUser: JwtUser,
+    @Param() params: { chatRoomId: string },
+    @Body() message,
+  ) {
+    return this.chatsService.createMessage(
+      +params.chatRoomId,
+      jwtUser,
+      message,
+    );
   }
 }

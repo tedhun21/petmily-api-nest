@@ -1,3 +1,3 @@
 export class CreateChatRoomInput {
-  opponentId: string;
+  opponentIds: number[];
 }

@@ -13,7 +13,12 @@ export class Message extends CoreEntity {
   @JoinColumn({ name: 'senderId' })
   sender: User;
 
-  @ManyToOne(() => ChatRoom, (chatRoom) => chatRoom.messages)
+  @ManyToOne(() => ChatRoom, (chatRoom) => chatRoom.messages, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'chatRoomId' })
   chatRoom: ChatRoom;
+
+  @Column('simple-array', { default: [] })
+  readBy: number[];
 }

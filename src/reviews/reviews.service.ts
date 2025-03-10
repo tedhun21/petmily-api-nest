@@ -71,33 +71,26 @@ export class ReviewsService {
 
     // 트랜잭션 적용
     return await this.entityManager.transaction(async (manager) => {
-      // 리뷰 객체 생성
-      const review = this.reviewsRepository.create({
-        ...createReviewInput,
-        reservation: { id: reservationId },
-        ...(photoUrls.length && { photos: photoUrls }),
-      });
-
       try {
-        return await this.entityManager.transaction(async (manager) => {
-          // Create review entity with optional photos
-          const review = this.reviewsRepository.create({
-            ...createReviewInput,
-            reservation: { id: reservationId },
-            ...(photoUrls.length > 0 && { photos: photoUrls }),
-          });
-
-          // Save the new review and update petsitter's rating
-          const newReview = await manager.save(review);
-          await this.usersService.updatePetsitterStar(
-            reservation.petsitter.id,
-            star,
-            manager,
-            true,
-          );
-
-          return { id: newReview.id, message: 'Successfully created review' };
+        // ✅ 트랜잭션 내에서 review 객체 생성
+        const review = manager.create(Review, {
+          ...createReviewInput,
+          reservation: { id: reservationId },
+          ...(photoUrls.length > 0 && { photos: photoUrls }),
         });
+
+        // ✅ review 저장
+        const newReview = await manager.save(review);
+
+        // ✅ 펫시터 별점 업데이트
+        await this.usersService.updatePetsitterStar(
+          reservation.petsitter.id,
+          star,
+          manager,
+          true,
+        );
+
+        return { id: newReview.id, message: 'Successfully created review' };
       } catch (e) {
         throw new InternalServerErrorException('Failed to create a review');
       }
