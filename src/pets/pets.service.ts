@@ -10,7 +10,7 @@ import { Repository } from 'typeorm';
 import { Pet } from './entity/pet.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UploadsService } from 'src/uploads/uploads.service';
-import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { UpdatePetInput } from './dto/update.pet.dto';
 
 @Injectable()
@@ -51,8 +51,8 @@ export class PetsService {
     }
   }
 
-  async find(userId: number, pagination: PaginationInput) {
-    const { page, pageSize } = pagination;
+  async find(userId: number, paginationDto: PaginationDto) {
+    const { page, pageSize } = paginationDto;
 
     try {
       const [pets, total] = await this.petsRepository.findAndCount({

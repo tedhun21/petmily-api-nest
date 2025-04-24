@@ -16,7 +16,7 @@ import { PetsService } from './pets.service';
 
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 
 @Controller('pets')
@@ -36,8 +36,8 @@ export class PetsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  find(@AuthUser() jwtUser: JwtUser, @Query() pagination: PaginationInput) {
-    return this.petsService.find(jwtUser.id, pagination);
+  find(@AuthUser() jwtUser: JwtUser, @Query() paginationDto: PaginationDto) {
+    return this.petsService.find(jwtUser.id, paginationDto);
   }
 
   @Get(':id')

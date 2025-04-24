@@ -1,4 +1,4 @@
-export class PaginationInput {
+export class PaginationDto {
   page: string;
   pageSize: string;
 }

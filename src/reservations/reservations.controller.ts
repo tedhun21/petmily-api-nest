@@ -14,7 +14,7 @@ import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { ReservationsService } from './reservations.service';
 import { UpdateReservationInput } from './dto/update.reservation.dto';
 import { ParamInput } from 'src/common/dto/param.dto';
-import { FindReservationsInput } from './dto/find.reservation.dto';
+import { FindReservationsDto } from './dto/find.reservation.dto';
 
 @Controller('reservations')
 export class ReservationsController {
@@ -33,9 +33,9 @@ export class ReservationsController {
   @Get()
   find(
     @AuthUser() jwtUser: JwtUser,
-    @Query() findReservationsInput: FindReservationsInput,
+    @Query() findReservationsDto: FindReservationsDto,
   ) {
-    return this.reservationsService.find(jwtUser, findReservationsInput);
+    return this.reservationsService.find(jwtUser, findReservationsDto);
   }
 
   @UseGuards(JwtAuthGuard)

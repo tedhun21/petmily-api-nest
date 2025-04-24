@@ -1,6 +1,6 @@
-import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
-export class FindPossiblePetsittersInput extends PaginationInput {
+export class FindPossiblePetsittersInput extends PaginationDto {
   location: string;
   date: string;
   startTime: string;

@@ -1,47 +1,107 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import * as Redis from 'ioredis';
+import Redis from 'ioredis';
 import { getLocations } from 'src/common/location/location.utils';
 
 @Injectable()
 export class RedisService implements OnModuleInit {
-  private redisClient: Redis.Redis;
+  private redisClient: Redis; // 일반 Redis 클라이언트
+  private publisherClient: Redis;
+  private subscriberClient: Redis; // Pub/Sub 구독용 클라이언트
 
   constructor() {
-    // Redis 클라이언트 초기화
-    this.redisClient = new Redis.default({
-      host: 'localhost', // Redis 서버 주소
-      port: 6379, // Redis 서버 포트
-      db: 0, // 사용하는 데이터베이스 인덱스,
+    this.redisClient = this.createRedisClient();
+    this.publisherClient = this.createRedisClient();
+    this.subscriberClient = this.createRedisClient();
+  }
 
-      // ❗ 3초 동안만 재시도 후 포기
-      retryStrategy(times) {
-        if (times >= 3) {
-          console.error('❌ Giving up on Redis reconnect.');
-          return undefined; // 기본 재시도 로직 사용
-        }
-        console.warn(`⚠️ Attempting Redis reconnect... (${times}/3)`);
-        return 1000; // 1초 후 재시도
-      },
+  private createRedisClient() {
+    const client = new Redis({
+      host: 'localhost',
+      port: 6379,
+      db: 0,
+      retryStrategy: RedisService.retryStrategy,
     });
+
+    client.on('error', (err) => {
+      console.error('Redis Client Error:', err);
+    });
+
+    return client;
+  }
+
+  //  재연결 전략 (최대 3번 재시도)
+  private static retryStrategy(times: number): number | null {
+    if (times >= 2) {
+      console.error('❌ Redis 연결 실패: 최대 재시도 횟수 초과');
+      return null; // 재시도 중단
+    }
+    const delay = Math.min(times * 500, 2000); // 0.5초, 1초, 최대 2초 대기 후 재시도
+    console.warn(`⚠️ Redis 재연결 시도 중... (${times}/3)`);
+    return delay;
   }
 
   async onModuleInit() {
+    if (!this.redisClient) {
+      console.warn('⚠️ Redis 사용 불가: 서버는 계속 실행됩니다.');
+      return;
+    }
+
     try {
-      // Redis 서버가 연결되었는지 확인
       await this.redisClient.ping();
-      console.log('REDIS: ✅ Redis is connected');
+      console.log('✅ Redis connected');
 
       const exists = await this.redisClient.exists('location:count');
-
-      if (exists) {
-        console.log(`REDIS: ℹ️ "${'location:count'}" already exists`);
-      } else if (!exists) {
+      if (!exists) {
         await this.seedLocations();
       }
     } catch (error) {
-      console.error('REDIS: ❌ Redis connection failed:', error);
-      this.redisClient = null; // Redis 클라이언트 null 처리
+      console.error('❌ Redis 연결 확인 실패:', error.message);
+      this.redisClient = null;
+      this.publisherClient = null;
+      this.subscriberClient = null;
     }
+  }
+
+  getClient(): Redis {
+    if (!this.redisClient) {
+      throw new Error('REDIS: ❌ Redis client is not initialized.');
+    }
+    return this.redisClient;
+  }
+
+  getPublisherClient(): Redis {
+    if (!this.publisherClient) {
+      throw new Error('REDIS: ❌ Redis publisher client is not initialized.');
+    }
+    return this.publisherClient;
+  }
+
+  // Pub/Sub - 구독 전용
+  getSubscriberClient(): Redis {
+    if (!this.subscriberClient) {
+      throw new Error('REDIS: ❌ Redis subscriber client is not initialized.');
+    }
+    return this.subscriberClient;
+  }
+
+  async setKey(key: string, value: string): Promise<string> {
+    return await this.redisClient.set(key, value);
+  }
+
+  async getKey(key: string): Promise<string | null> {
+    return await this.redisClient.get(key);
+  }
+
+  async subscribe(channel: string, callback: (message: string) => void) {
+    const subscriber = this.getSubscriberClient();
+    await subscriber.subscribe(channel);
+    subscriber.on('message', (ch, message) => {
+      if (ch === channel) callback(message);
+    });
+  }
+
+  async publish(channel: string, message: string) {
+    await this.redisClient.publish(channel, message);
   }
 
   // 서버 시작시에 locations 데이터 등록
@@ -66,22 +126,6 @@ export class RedisService implements OnModuleInit {
     } catch (error) {
       console.error('REDIS: ❌ Failed to save location data to Redis:', error);
     }
-  }
-
-  getClient(): Redis.Redis {
-    if (!this.redisClient) {
-      throw new Error('REDIS: ❌ Redis client is not initialized.');
-    }
-    return this.redisClient;
-  }
-
-  // 데이터를 Redis에 저장
-  async setKey(key: string, value: string): Promise<string> {
-    return await this.redisClient.set(key, value);
-  }
-
-  async getKey(key: string): Promise<string | null> {
-    return await this.redisClient.get(key);
   }
 
   // 특정 지역의  좌표 조회 (index: location:data => HSET)

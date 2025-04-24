@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -40,7 +41,13 @@ export class ChatsController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Put('unread')
+  @Get('unread-counts')
+  getUnreadCounts(@AuthUser() jwtUser: JwtUser) {
+    return this.chatsService.getUnreadCounts(jwtUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('unread-counts')
   updateUnreadCount(
     @AuthUser() jwtUser: JwtUser,
     @Query() updateUnreadCountQuery,
@@ -55,7 +62,7 @@ export class ChatsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  createChatRoom(
+  findO(
     @AuthUser() jwtUser: JwtUser,
     @Body() createChatRoomInput: { opponentIds: number[] },
   ) {
@@ -69,9 +76,9 @@ export class ChatsController {
   @Get(':chatRoomId')
   getChatRoom(
     @AuthUser() jwtUser: JwtUser,
-    @Param() param: { chatRoomId: string },
+    @Param('chatRoomId', ParseIntPipe) chatRoomId: number,
   ) {
-    return this.chatsService.getChatRoom(jwtUser, param);
+    return this.chatsService.getChatRoom(jwtUser, chatRoomId);
   }
 
   @UseGuards(JwtAuthGuard)

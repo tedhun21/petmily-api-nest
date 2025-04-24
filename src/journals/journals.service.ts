@@ -13,7 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { UpdateJournalInput } from './dto/update.journal.dto';
-import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @Injectable()
 export class JournalsService {
@@ -68,9 +68,9 @@ export class JournalsService {
     }
   }
 
-  async find(jwtUser: JwtUser, pagination: PaginationInput) {
+  async find(jwtUser: JwtUser, paginationDto: PaginationDto) {
     const { id: userId, role } = jwtUser;
-    const { page, pageSize } = pagination;
+    const { page, pageSize } = paginationDto;
 
     const whereCondition =
       role === 'Client'

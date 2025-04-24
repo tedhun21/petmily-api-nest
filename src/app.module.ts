@@ -21,9 +21,12 @@ import { ChatRoom } from './chats/entity/chatRoom.entity';
 import { Message } from './chats/entity/message.entity';
 import { MapsModule } from './maps/maps.module';
 import { SearchModule } from './search/search.module';
-import { ClientsModule, Transport } from '@nestjs/microservices';
 import { RedisModule } from './redis/redis.module';
 import { ChatMember } from './chats/entity/chatMember.entity';
+import { NotificationsModule } from './notifications/notifications.module';
+import { Notification } from './notifications/entity/notification.entity';
+import { NotificationRead } from './notifications/entity/notification_read.entity';
+import { KafkaModule } from './kafka/kafka.module';
 
 @Module({
   imports: [
@@ -49,16 +52,11 @@ import { ChatMember } from './chats/entity/chatMember.entity';
         ChatRoom,
         Message,
         ChatMember,
+        Notification,
+        NotificationRead,
       ],
       synchronize: true,
     }),
-    ClientsModule.register([
-      {
-        name: 'SEARCT_SERVICE',
-        transport: Transport.REDIS,
-        options: { host: 'localhost', port: 6379 },
-      },
-    ]),
     UsersModule,
     AuthModule,
     PetsModule,
@@ -72,6 +70,8 @@ import { ChatMember } from './chats/entity/chatMember.entity';
     MapsModule,
     SearchModule,
     RedisModule,
+    NotificationsModule,
+    KafkaModule,
   ],
   controllers: [],
   providers: [],

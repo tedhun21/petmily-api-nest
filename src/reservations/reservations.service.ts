@@ -4,6 +4,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { CreateReservationInput } from './dto/create.reservation.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
@@ -14,20 +15,32 @@ import {
   MoreThan,
   Repository,
 } from 'typeorm';
-import { Reservation, Status } from './entity/reservation.entity';
+import { Reservation, ReservationStatus } from './entity/reservation.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UpdateReservationInput } from './dto/update.reservation.dto';
-import { FindReservationsInput } from './dto/find.reservation.dto';
+import { FindReservationsDto } from './dto/find.reservation.dto';
 import { User, UserRole } from 'src/users/entity/user.entity';
 import { ParamInput } from 'src/common/dto/param.dto';
+import { ClientKafka } from '@nestjs/microservices';
+import { KafkaService } from 'src/kafka/kafka.service';
+import { NotificationType } from 'src/notifications/entity/notification.entity';
 
 @Injectable()
-export class ReservationsService {
+export class ReservationsService implements OnModuleInit {
+  private producer: ClientKafka;
+
   constructor(
     @InjectRepository(Reservation)
     private readonly reservationsRepository: Repository<Reservation>,
     private readonly entityManager: EntityManager,
+    private readonly kafkaService: KafkaService,
   ) {}
+
+  async onModuleInit() {
+    // kafak producer 초기화
+    this.producer = this.kafkaService.getProducer();
+  }
+
   async create(
     jwtUser: JwtUser,
     createReservationInput: CreateReservationInput,
@@ -73,11 +86,9 @@ export class ReservationsService {
     }
   }
 
-  async find(jwtUser: JwtUser, findReservationsInput: FindReservationsInput) {
+  async find(jwtUser: JwtUser, findReservationsDto: FindReservationsDto) {
     const { id: userId, role } = jwtUser;
-    const { date, status, page, pageSize } = findReservationsInput;
-
-    console.log('date: ', date);
+    const { date, status, page, pageSize } = findReservationsDto;
 
     const whereCondition = {} as any;
     // const dateCondition = {} as any;
@@ -100,19 +111,19 @@ export class ReservationsService {
 
     if (status) {
       switch (status) {
-        case Status.PENDING:
-          whereCondition.status = Status.PENDING;
+        case ReservationStatus.PENDING:
+          whereCondition.status = ReservationStatus.PENDING;
           break;
-        case Status.CANCELED:
-          whereCondition.status = Status.CANCELED;
-          break;
-
-        case Status.ACCEPTED:
-          whereCondition.status = Status.ACCEPTED;
+        case ReservationStatus.CANCELED:
+          whereCondition.status = ReservationStatus.CANCELED;
           break;
 
-        case Status.COMPLETED:
-          whereCondition.status = Status.COMPLETED;
+        case ReservationStatus.ACCEPTED:
+          whereCondition.status = ReservationStatus.ACCEPTED;
+          break;
+
+        case ReservationStatus.COMPLETED:
+          whereCondition.status = ReservationStatus.COMPLETED;
           break;
 
         default:
@@ -346,5 +357,53 @@ export class ReservationsService {
     }
 
     return 'Invalid role';
+  }
+
+  // 예약 업데이트 알림 전송
+  async updateAndNotify(
+    reservationId: number,
+    status: ReservationStatus,
+    triggerUser: { id: number; role: UserRole },
+  ) {
+    const { role: userRole } = triggerUser;
+
+    try {
+      // 1️⃣ 예약 조회 및 상태 업데이트
+      const reservation = await this.entityManager.findOne(Reservation, {
+        where: { id: reservationId },
+        relations: ['client', 'petsitter'],
+        select: {
+          client: { id: true, nickname: true },
+          petsitter: { id: true, nickname: true },
+        },
+      });
+
+      if (!reservation) {
+        throw new NotFoundException('No reservation found');
+      }
+
+      reservation.status = status;
+      await this.entityManager.save(reservation); // 트랜잭션 없이 저장
+
+      const sender =
+        userRole === UserRole.CLIENT
+          ? reservation.client
+          : reservation.petsitter;
+      const receiver =
+        userRole === UserRole.PETSITTER
+          ? reservation.client
+          : reservation.petsitter;
+
+      // 2️⃣ Kafka 이벤트 전송 (비동기)
+      await this.producer.emit('reservation-update', {
+        reservationId,
+        status,
+        sender,
+        receiverIds: [sender.id, receiver.id],
+        eventType: NotificationType.RESERVATION_UPDATE,
+      });
+    } catch (e) {
+      console.error('Error updating reservation:', e);
+    }
   }
 }

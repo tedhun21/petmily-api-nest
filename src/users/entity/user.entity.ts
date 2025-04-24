@@ -25,7 +25,8 @@ import {
 import { Pet, Species } from 'src/pets/entity/pet.entity';
 import { Reservation } from 'src/reservations/entity/reservation.entity';
 import { ChatMember } from 'src/chats/entity/chatMember.entity';
-// import { SearchType } from '../dto/updateRecent.user';
+import { Notification } from 'src/notifications/entity/notification.entity';
+import { NotificationRead } from 'src/notifications/entity/notification_read.entity';
 
 export enum UserRole {
   USER = 'User',
@@ -168,6 +169,15 @@ export class User extends CoreEntity {
 
   @OneToMany(() => ChatMember, (chatMember) => chatMember.user)
   chatMembers: ChatMember[];
+
+  @ManyToMany(() => Notification, (notification) => notification.receivers)
+  receivedNotifications: Notification[];
+
+  @OneToMany(
+    () => NotificationRead,
+    (notificationRead) => notificationRead.user,
+  )
+  notificationReads: NotificationRead[];
 
   @BeforeInsert()
   @BeforeUpdate()

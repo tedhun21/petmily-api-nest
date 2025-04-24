@@ -1,5 +1,5 @@
-import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
-export class FindReviewsInput extends PaginationInput {
+export class FindReviewsInput extends PaginationDto {
   photo?: 'true' | 'false';
 }

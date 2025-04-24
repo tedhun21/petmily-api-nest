@@ -32,10 +32,36 @@ services:
     environment:
       - ELASTICSEARCH_HOST=elasticsearch
 
+  zookeeper:
+    image: zookeeper:3.8
+    container_name: zookeeper
+    ports:
+      - '2181:2181' # Zookeeper 포트
+    environment:
+      - ZOOKEEPER_SERVER_ID=1
+      - ZOOKEEPER_ADMINSERVER_ENABLED=true
+    networks:
+      - kafka_network
+
+  kafka:
+    image: wurstmeister/kafka:latest
+    container_name: kafka
+    ports:
+      - '9092:9092' # 외부에서 접근할 수 있는 포트
+      - '9093:9093' # 내부 Docker 네트워크 포트
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://localhost:9092' # 외부 접근 가능한 IP
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT'
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+    depends_on:
+      - zookeeper
+    networks:
+      - kafka_network
+
   redis:
     image: redis:latest
     container_name: redis
-    restart: always # Redis가 중지되면 자동으로 시작
     ports:
       - '6379:6379'
     volumes:
@@ -77,6 +103,10 @@ services:
           memory: 1g # 컨테이너가 사용할 최대 메모리 (1GB)
         reservations:
           memory: 256m # 최소 예약 메모리 (256MB)
+
+networks:
+  kafka_network:
+    driver: bridge
 
 volumes:
   redis_data:

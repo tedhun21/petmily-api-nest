@@ -15,7 +15,7 @@ import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JournalsService } from './journals.service';
-import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @Controller('journals')
 export class JournalsController {
@@ -40,8 +40,8 @@ export class JournalsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  find(@AuthUser() jwtUser: JwtUser, @Query() pagination: PaginationInput) {
-    return this.journalsService.find(jwtUser, pagination);
+  find(@AuthUser() jwtUser: JwtUser, @Query() paginationDto: PaginationDto) {
+    return this.journalsService.find(jwtUser, paginationDto);
   }
 
   @UseGuards(JwtAuthGuard)

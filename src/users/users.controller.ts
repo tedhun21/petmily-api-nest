@@ -17,7 +17,7 @@ import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { UpdateUserInput } from './dto/update.user.dto';
 import { ParamInput } from 'src/common/dto/param.dto';
-import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { FindPossiblePetsittersInput } from './dto/findPossible.petsitter.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UpdateFavoriteInput } from './dto/updateFavorite.user';
@@ -92,9 +92,9 @@ export class UsersController {
   @Get('petsitters/favorite')
   findFavoritePetsitters(
     @AuthUser() jwtUser: JwtUser,
-    @Query() pagination: PaginationInput,
+    @Query() paginationDto: PaginationDto,
   ) {
-    return this.usersService.findFavoritePetsitters(jwtUser, pagination);
+    return this.usersService.findFavoritePetsitters(jwtUser, paginationDto);
   }
 
   @Get('petsitters/possible')
@@ -110,9 +110,9 @@ export class UsersController {
   @Get('petsitters/used')
   findUsedPetsitters(
     @AuthUser() jwtUser: JwtUser,
-    @Query() pagination: PaginationInput,
+    @Query() paginationDto: PaginationDto,
   ) {
-    return this.usersService.findUsedPetsitters(jwtUser, pagination);
+    return this.usersService.findUsedPetsitters(jwtUser, paginationDto);
   }
 
   @Get('petsitters/star')

@@ -15,7 +15,7 @@ import {
   OneToOne,
 } from 'typeorm';
 
-export enum Status {
+export enum ReservationStatus {
   PENDING = 'Pending',
   CANCELED = 'Canceled',
   ACCEPTED = 'Accepted',
@@ -49,9 +49,9 @@ export class Reservation extends CoreEntity {
   @IsString()
   detailAddress: string;
 
-  @Column({ type: 'enum', enum: Status })
-  @IsEnum(Status)
-  status: Status;
+  @Column({ type: 'enum', enum: ReservationStatus })
+  @IsEnum(ReservationStatus)
+  status: ReservationStatus;
 
   @Column({ nullable: true })
   @IsString()

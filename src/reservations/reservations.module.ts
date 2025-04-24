@@ -6,6 +6,9 @@ import { Reservation } from './entity/reservation.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ReservationsGateWay } from './reservations.gateway';
+import { NotificationsModule } from 'src/notifications/notifications.module';
+import { KafkaModule } from 'src/kafka/kafka.module';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
@@ -18,6 +21,9 @@ import { ReservationsGateWay } from './reservations.gateway';
       }),
       inject: [ConfigService],
     }),
+    NotificationsModule,
+    RedisModule,
+    KafkaModule,
   ],
   controllers: [ReservationsController],
   providers: [ReservationsService, ReservationsGateWay],

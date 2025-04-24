@@ -18,30 +18,31 @@ export class ChatsGateWay {
   @WebSocketServer()
   server: Server;
 
-  @SubscribeMessage('joinRoom')
-  handleJoinRoom(
+  // 유저가 채팅방에 조인
+  @SubscribeMessage('joinChatRoom')
+  handleJoinChatRoom(
     @MessageBody() chatRoomId: string,
     @ConnectedSocket() client: Socket,
   ) {
+    client.join(`chatRoom_${chatRoomId}`);
     console.log(`Client joined room: ${chatRoomId}`);
-    client.join(chatRoomId);
   }
 
-  @SubscribeMessage('joinUser')
-  handleJoinUser(@ConnectedSocket() client: Socket) {
-    try {
-      const token = client.handshake.auth.token;
-      const decoded = this.jwtService.verify(token);
+  @SubscribeMessage('joinChatUser')
+  async handleJoinChatUser(@ConnectedSocket() client: Socket) {
+    const token = client.handshake.auth.token;
 
-      console.log(`User ${decoded.id} joined their own room`);
-      this.server.to(decoded.id.toString()).emit(decoded.id.toString());
-      client.join(decoded.id.toString());
+    try {
+      const { id: userId } = await this.jwtService.verify(token);
+
+      client.join(`chatUser_${userId.toString()}`);
+      console.log(`User ${userId} joined their own room`);
     } catch (e) {
       console.error('Join user failed:', e);
     }
   }
 
-  @SubscribeMessage('send')
+  @SubscribeMessage('sendMessage')
   async handleSendMessage(
     @MessageBody()
     data: {
@@ -67,14 +68,14 @@ export class ChatsGateWay {
       if (newMessage && chatRoomId && opponentIds.length > 0) {
         // 채팅방에 메세지 전송
         this.server
-          .to(chatRoomId.toString())
+          .to(`chatRoom_${chatRoomId.toString()}`)
           .emit('chatRoomMessage', newMessage);
 
         // 개별 유저에게 전송
         for (const memberId of opponentIds) {
           if (memberId !== decoded.id) {
             this.server
-              .to(memberId.toString())
+              .to(`chatUser_${memberId.toString()}`)
               .emit('directMessage', newMessage);
           }
         }
@@ -82,5 +83,30 @@ export class ChatsGateWay {
     } catch (e) {
       console.error(e);
     }
+  }
+
+  @SubscribeMessage('readMessage')
+  async markReadMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data,
+  ) {
+    const token = client.handshake.auth.token; // Socket.IO 미들웨어로 token 잡기
+    const { chatRoomId, messageId } = data;
+
+    try {
+      const decoded = await this.jwtService.verify(token);
+
+      await this.chatsService.updateReadMessages(
+        decoded,
+        chatRoomId,
+        messageId,
+      );
+
+      // 채팅방에 읽음표시
+      this.server.to(`chatRoom_${chatRoomId.toString()}`).emit('readMessage', {
+        messageId,
+        userId: decoded.id,
+      });
+    } catch (e) {}
   }
 }

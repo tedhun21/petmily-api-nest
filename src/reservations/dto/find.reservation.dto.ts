@@ -1,7 +1,7 @@
-import { PaginationInput } from 'src/common/dto/pagination.dto';
-import { Status } from '../entity/reservation.entity';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { ReservationStatus } from '../entity/reservation.entity';
 
-export class FindReservationsInput extends PaginationInput {
-  status?: Status | 'all';
+export class FindReservationsDto extends PaginationDto {
+  status?: ReservationStatus | 'all';
   date?: string;
 }

@@ -12,15 +12,14 @@ import { User, UserRole } from './entity/user.entity';
 import { CreateUserInput } from './dto/create.user.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { UpdateUserInput } from './dto/update.user.dto';
-import { PaginationInput } from 'src/common/dto/pagination.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { FindPossiblePetsittersInput } from './dto/findPossible.petsitter.dto';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { ParamInput } from 'src/common/dto/param.dto';
-import { Status } from 'src/reservations/entity/reservation.entity';
+import { ReservationStatus } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { JwtService } from '@nestjs/jwt';
 import { UpdateFavoriteInput } from './dto/updateFavorite.user';
-// import { RecentSearchInput } from './dto/updateRecent.user';
 import { RedisService } from 'src/redis/redis.service';
 import { isValidLocation } from 'src/common/location/location.utils';
 
@@ -256,9 +255,9 @@ export class UsersService {
     }
   }
 
-  async findFavoritePetsitters(jwtUser: JwtUser, pagination: PaginationInput) {
+  async findFavoritePetsitters(jwtUser: JwtUser, paginationDto: PaginationDto) {
     const { id: userId } = jwtUser;
-    const { page, pageSize } = pagination;
+    const { page, pageSize } = paginationDto;
 
     // 1. 클라이언트 유저를 찾음
     const user = await this.usersRepository.findOne({
@@ -376,12 +375,12 @@ export class UsersService {
     };
   }
 
-  async findUsedPetsitters(jwtUser: JwtUser, pagination: PaginationInput) {
+  async findUsedPetsitters(jwtUser: JwtUser, paginationDto: PaginationDto) {
     try {
       // 내가 가지고 있는 예약
       const reservations = await this.reservationsService.find(jwtUser, {
-        status: Status.COMPLETED,
-        ...pagination,
+        status: ReservationStatus.COMPLETED,
+        ...paginationDto,
       });
       return {
         results: reservations.results.map(
@@ -395,8 +394,8 @@ export class UsersService {
   }
 
   // 위치 기반 펫시터 검색
-  async findPetsittersByLocation(words: string, pagination: PaginationInput) {
-    const { page, pageSize } = pagination;
+  async findPetsittersByLocation(words: string, paginationDto: PaginationDto) {
+    const { page, pageSize } = paginationDto;
 
     const wordsArray = words.split(' ').map((word) => `%${word}%`); // 검색어를 LIKE 패턴으로 변환
 

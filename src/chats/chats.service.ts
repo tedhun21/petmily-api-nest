@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { UserRole } from 'src/users/entity/user.entity';
 
@@ -93,9 +94,10 @@ export class ChatsService {
       chatRooms.length > 0 ? chatRooms[chatRooms.length - 1].id : null;
 
     const chatRoomsWithLastMessage = chatRooms.map((chatRoom) => {
-      const me = chatRoom.chatMembers.find(
+      const meMember = chatRoom.chatMembers.find(
         (member) => member.user.id === userId,
       );
+      const me = meMember.user;
 
       const others = chatRoom.chatMembers
         .filter((member) => member.user.id !== userId)
@@ -112,8 +114,12 @@ export class ChatsService {
 
       return {
         id: chatRoom.id,
-        unreadCount: me.unreadCount,
-        chatMembers: { me, others },
+        chatMembers: {
+          unreadCount: meMember.unreadCount,
+          membersCount: chatRoom.chatMembers.length,
+          me,
+          others,
+        },
         lastMessage: lastMessage
           ? { content: lastMessage.content, createdAt: lastMessage.createdAt }
           : null,
@@ -126,9 +132,8 @@ export class ChatsService {
     };
   }
 
-  async getChatRoom(jwtUser: JwtUser, param: { chatRoomId: string }) {
+  async getChatRoom(jwtUser: JwtUser, chatRoomId: number) {
     const { id: userId } = jwtUser;
-    const { chatRoomId } = param;
 
     try {
       const chatRoom = await this.chatRoomsRepository.findOne({
@@ -139,7 +144,7 @@ export class ChatsService {
           chatMembers: {
             id: true,
             unreadCount: true,
-            user: { id: true, nickname: true, photo: true },
+            user: { id: true, nickname: true, photo: true, role: true },
             createdAt: true,
             updatedAt: true,
           },
@@ -148,8 +153,9 @@ export class ChatsService {
 
       // 현재 사용자 정보 찾기
       const me =
-        chatRoom.chatMembers.find((member) => member.user.id === userId) ||
+        chatRoom.chatMembers.find((member) => member.user.id === userId).user ||
         null;
+
       // 상대방 정보 필터링
       const others = chatRoom.chatMembers
         .filter((member) => member.user.id !== userId)
@@ -162,7 +168,7 @@ export class ChatsService {
 
       return {
         id: chatRoom.id,
-        chatMembers: { me, others },
+        chatMembers: { membersCount: chatRoom.chatMembers.length, me, others },
         createdAt: chatRoom.createdAt,
         updatedAt: chatRoom.updatedAt,
       };
@@ -221,79 +227,70 @@ export class ChatsService {
 
     // 트랜잭션
     return await this.dataSource.transaction(async (manager) => {
-      try {
-        // chatRoom 생성 및 저장
-        const chatRoom = manager.create(ChatRoom, {});
-        const savedChatRoom = await manager.save(chatRoom);
+      // chatRoom 생성 및 저장
+      const chatRoom = manager.create(ChatRoom, {});
+      const savedChatRoom = await manager.save(chatRoom);
 
-        if (!savedChatRoom) {
-          throw new InternalServerErrorException('Failed to save chat room');
-        }
-
-        // chatMembers 생성 및 저장
-        const chatMembers = opponentIds.map((userId) =>
-          manager.create(ChatMember, {
-            user: { id: userId },
-            chatRoom: savedChatRoom,
-          }),
-        );
-
-        await manager.save(chatMembers);
-
-        // chatMembers 조회
-        const savedChatMembers = await manager.find(ChatMember, {
-          where: { chatRoom: { id: savedChatRoom.id } },
-          relations: ['user'],
-          select: {
-            id: true,
-            unreadCount: true,
-            user: { id: true, nickname: true, role: true, photo: true },
-          },
-        });
-
-        if (!savedChatMembers || savedChatMembers.length === 0) {
-          throw new InternalServerErrorException(
-            'Failed to fetch chat members',
-          );
-        }
-
-        // me와 others 구분
-        const me = savedChatMembers.find(
-          (member) => member.user.id === user.id,
-        );
-        const others = savedChatMembers.filter(
-          (member) => member.user.id !== user.id,
-        );
-
-        if (!me) {
-          throw new InternalServerErrorException(
-            'Failed to find current user in chat room',
-          );
-        }
-
-        // 원하는 구조로 반환
-        return {
-          id: savedChatRoom.id,
-          chatMembers: {
-            me: {
-              id: me.user.id,
-              nickname: me.user.nickname,
-              photo: me.user.photo,
-              role: me.user.role,
-              unreadCount: me.unreadCount,
-            },
-            others: others.map((member) => ({
-              id: member.user.id,
-              nickname: member.user.nickname,
-              photo: member.user.photo,
-              role: member.user.role,
-            })),
-          },
-        };
-      } catch (e) {
-        console.error('Error creating chat room:', e);
-        throw new InternalServerErrorException('Fail to create a chat room');
+      if (!savedChatRoom) {
+        throw new InternalServerErrorException('Failed to save chat room');
       }
+
+      // chatMembers 생성 및 저장
+      const chatMembers = opponentIds.map((userId) =>
+        manager.create(ChatMember, {
+          user: { id: userId },
+          chatRoom: savedChatRoom,
+        }),
+      );
+
+      await manager.save(chatMembers);
+
+      // chatMembers 조회
+      const savedChatMembers = await manager.find(ChatMember, {
+        where: { chatRoom: { id: savedChatRoom.id } },
+        relations: ['user'],
+        select: {
+          id: true,
+          unreadCount: true,
+          user: { id: true, nickname: true, role: true, photo: true },
+        },
+      });
+
+      if (!savedChatMembers || savedChatMembers.length === 0) {
+        throw new InternalServerErrorException('Failed to fetch chat members');
+      }
+
+      // me와 others 구분
+      const me = savedChatMembers.find((member) => member.user.id === user.id);
+      const others = savedChatMembers.filter(
+        (member) => member.user.id !== user.id,
+      );
+
+      if (!me) {
+        throw new InternalServerErrorException(
+          'Failed to find current user in chat room',
+        );
+      }
+
+      // 원하는 구조로 반환
+      return {
+        id: savedChatRoom.id,
+        chatMembers: {
+          me: {
+            id: me.user.id,
+            nickname: me.user.nickname,
+            photo: me.user.photo,
+            role: me.user.role,
+            unreadCount: me.unreadCount,
+          },
+          others: others.map((member) => ({
+            id: member.user.id,
+            nickname: member.user.nickname,
+            photo: member.user.photo,
+            role: member.user.role,
+          })),
+        },
+      };
     });
   }
 
@@ -308,11 +305,16 @@ export class ChatsService {
 
     // chatRoom 유효성 검사
 
-    const chatRoomExists = await this.chatRoomsRepository.findOne({
-      where: { id: +chatRoomId, chatMembers: { user: { id: userId } } },
+    const chatRoom = await this.chatRoomsRepository.findOne({
+      where: { id: +chatRoomId },
+      relations: ['chatMembers', 'chatMembers.user'],
     });
 
-    if (!chatRoomExists) {
+    const isMember = chatRoom.chatMembers.some(
+      (member) => member.user.id === userId,
+    );
+
+    if (!chatRoom || !isMember) {
       return {
         results: null,
         pagination: {
@@ -328,13 +330,13 @@ export class ChatsService {
     const queryOptions: any = {
       where: { chatRoom: { id: +chatRoomId } },
       order: { createdAt: 'DESC' },
-      relations: ['sender', 'chatRoom'],
+      relations: ['sender'],
       select: {
         id: true,
         content: true,
         createdAt: true,
-        sender: { id: true },
-        chatRoom: { id: true },
+        sender: { id: true, nickname: true, photo: true, role: true },
+        readBy: true,
       },
       take: +pageSize,
     };
@@ -386,7 +388,8 @@ export class ChatsService {
       throw new InternalServerErrorException('No chat room found');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    // 트랜잭션
+    return await this.dataSource.transaction(async (manager) => {
       // 1. 메세지 생성
       const newMessage = manager.create(Message, {
         chatRoom: { id: chatRoom.id },
@@ -398,7 +401,7 @@ export class ChatsService {
       // 2. 메세지 저장
       const savedMessage = await manager.save(Message, newMessage);
 
-      // 3. 채팅 멤버 목록 가져오기 (현재 유저 제외)
+      // 3. 채팅 멤버 목록 가져오기 (상대방만, 현재 유저 제외)
       const chatMembers = await manager.find(ChatMember, {
         where: { chatRoom: { id: chatRoomId }, user: { id: Not(userId) } },
       });
@@ -411,6 +414,22 @@ export class ChatsService {
 
       return savedMessage;
     });
+  }
+
+  async getUnreadCounts(jwtUser: JwtUser) {
+    const { id: userId } = jwtUser;
+
+    const chatMembers = await this.chatMembersRepository.find({
+      where: { user: { id: userId }, unreadCount: Not(0) },
+      relations: ['chatRoom'],
+    });
+
+    const unreadCounts = chatMembers.reduce(
+      (acc, chatMember) => acc + chatMember.unreadCount,
+      0,
+    );
+
+    return unreadCounts;
   }
 
   async updateUnreadCount(
@@ -443,6 +462,45 @@ export class ChatsService {
     } catch (e) {
       throw new InternalServerErrorException('Fail to update unread count');
     }
+  }
+
+  async updateReadMessages(
+    jwtUser: JwtUser,
+    chatRoomId: number,
+    messageId: number,
+  ) {
+    const { id: userId } = jwtUser;
+
+    console.log('hi');
+
+    const chatRoom = await this.chatRoomsRepository.findOne({
+      where: { id: chatRoomId },
+      relations: ['chatMembers', 'chatMembers.user'],
+    });
+
+    const isMember = chatRoom.chatMembers.some(
+      (member) => member.user.id === userId,
+    );
+
+    if (!chatRoom || !isMember) {
+      throw new NotFoundException('No chat room found');
+    }
+
+    const messagesToUpdate = await this.messagesRepository
+      .createQueryBuilder('message')
+      .where('message.chatRoom.id = :chatRoomId', { chatRoomId })
+      .andWhere('message.id <= :messageId', { messageId })
+      .andWhere('NOT (:userId = ANY(message.readBy))', { userId })
+      .getMany();
+
+    if (!messagesToUpdate || messagesToUpdate.length === 0) return;
+
+    return await this.dataSource.transaction(async (manager) => {
+      for (const message of messagesToUpdate) {
+        message.readBy.push(userId);
+        await manager.save(message);
+      }
+    });
   }
 
   async checkExistingChatRoom(memberIds: number[]) {
