@@ -41,12 +41,6 @@ export class ChatsController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('unread-counts')
-  getUnreadCounts(@AuthUser() jwtUser: JwtUser) {
-    return this.chatsService.getUnreadCounts(jwtUser);
-  }
-
-  @UseGuards(JwtAuthGuard)
   @Put('unread-counts')
   updateUnreadCount(
     @AuthUser() jwtUser: JwtUser,

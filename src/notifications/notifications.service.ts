@@ -6,6 +6,8 @@ import { NotificationRead } from './entity/notification_read.entity';
 import { User } from 'src/users/entity/user.entity';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { RedisService } from 'src/redis/redis.service';
+import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService {
@@ -14,10 +16,15 @@ export class NotificationsService {
     private readonly notificationsRepository: Repository<Notification>,
     @InjectRepository(NotificationRead)
     private readonly notificationReadsRepository: Repository<NotificationRead>,
+    private readonly notificationsGateway: NotificationsGateway,
     private readonly dataSource: DataSource,
+    private readonly redisService: RedisService,
   ) {}
 
-  // notification 생성 & notication_read 생성
+  // 트랜잭션
+  // 1. notification 생성
+  // 2. notication_read 생성
+  // 유저 unread count (redis) 증가
   async create(payload: {
     reservationId: number;
     sender: { id: number; nickname: string };
@@ -33,7 +40,7 @@ export class NotificationsService {
         break;
     }
 
-    return await this.dataSource.transaction(async (manager) => {
+    const notification = await this.dataSource.transaction(async (manager) => {
       const receivers = await manager
         .createQueryBuilder(User, 'user')
         .select(['user.id', 'user.nickname'])
@@ -50,15 +57,33 @@ export class NotificationsService {
 
       await manager.save(Notification, notification);
 
-      // NotificationRead 생성
-      const notificationReads = receivers.map((receiver) =>
-        manager.create(NotificationRead, { notification, user: receiver }),
-      );
+      // NotificationRead 생성 (sender + receivers)
+      const notificationReads = [
+        manager.create(NotificationRead, {
+          notification,
+          user: { id: payload.sender.id },
+          isRead: true,
+        }), // sender는 바로 읽음 처리
+        ...receivers.map((receiver) =>
+          manager.create(NotificationRead, { notification, user: receiver }),
+        ),
+      ];
 
       await manager.getRepository(NotificationRead).save(notificationReads);
 
       return notification;
     });
+
+    // Redis에 sender와 receiverIds에 해당하는 각 유저들의 unread count 증가 (트랜잭션 성공 후)
+    const allUserIds = [payload.sender.id, ...payload.receiverIds];
+
+    await Promise.all(
+      allUserIds.map((id) =>
+        this.redisService.incrementUnreadNotificationCount(id),
+      ),
+    );
+
+    return notification;
   }
 
   async find(jwtUser: JwtUser, date: string, paginationDto: PaginationDto) {
@@ -114,59 +139,84 @@ export class NotificationsService {
   }
 
   // NotificationRead 읽음 처리
+  // 트랜잭션
+  // 1. notification id 배열 가지고 반복
+  // 2. notification Read 찾기 (notificationId, userId) 이용해서
+  // 3. redis에 캐싱된 알림에 업데이트 (캐싱된 데이터가 없으면 그냥 놔두기)
   async updateNotificationRead(
     jwtUser: JwtUser,
     body: { notificationIds: string[]; isRead: boolean },
   ) {
     const { id: userId } = jwtUser;
     const { notificationIds, isRead } = body;
-
     const now = new Date();
-    const results = [];
 
-    for (const notificationId of notificationIds) {
-      try {
-        const notificationRead = await this.notificationReadsRepository.findOne(
-          {
-            where: {
-              notification: { id: Number(notificationId) },
-              user: { id: userId },
-            },
+    // 몇 개가 읽음처리 됐는지 카운트
+    const updatedIds: string[] = [];
+
+    await this.dataSource.transaction(async (manager) => {
+      // 트랜잭션 내에서 Repository를 manager로 직접 가져오기
+      const notificationReadRepository =
+        manager.getRepository(NotificationRead);
+
+      for (const notificationId of notificationIds) {
+        const notificationRead = await notificationReadRepository.findOne({
+          where: {
+            notification: { id: Number(notificationId) },
+            user: { id: userId },
           },
-        );
+        });
 
         if (!notificationRead) {
-          results.push({
-            id: notificationId,
-            success: false,
-            reason: 'Notification read record not found',
-          });
-          continue;
+          throw new Error(
+            `NotificationRead not found for notification ${notificationId}`,
+          );
         }
 
-        const updateData: any = { isRead };
-        if (isRead) {
-          updateData.readAt = now;
+        const wasRead = notificationRead.isRead;
+
+        notificationRead.isRead = isRead;
+        notificationRead.readAt = isRead ? now : null;
+
+        const saved = await notificationReadRepository.save(notificationRead);
+
+        if (saved.isRead && !wasRead) {
+          updatedIds.push(notificationId);
         }
-
-        await this.notificationReadsRepository.update(
-          { id: notificationRead.id },
-          updateData,
-        );
-
-        results.push({ id: notificationId, success: true });
-      } catch (e) {
-        results.push({
-          id: notificationId,
-          success: false,
-          reason: 'Unexpected error occurred',
-        });
       }
+    });
+
+    // Redis에서 읽지 않은 알림 개수 감소
+    if (isRead && updatedIds.length > 0) {
+      await this.redisService.decrementUnreadNotificationCount(
+        userId,
+        updatedIds.length,
+      );
     }
 
     return {
-      message: 'Processed notification read status updates',
-      results,
+      message: 'Successfully read notification',
+      updatedIds,
     };
+  }
+
+  // 유저의 안 읽음 알림 카운트 (자주 조회)
+  async getUnreadCount(jwtUser: JwtUser) {
+    const { id: userId } = jwtUser;
+
+    const cached =
+      await this.redisService.getUserUnreadNotificationCount(userId);
+
+    if (cached) {
+      return cached;
+    }
+
+    const unreadCount = await this.notificationReadsRepository.count({
+      where: { user: { id: userId }, isRead: false },
+    });
+
+    // DB에서 가져온 unreadCount redis에 저장
+    await this.redisService.setUserUnreadNotificationCount(userId, unreadCount);
+    return unreadCount;
   }
 }

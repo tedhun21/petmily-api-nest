@@ -399,7 +399,7 @@ export class ReservationsService implements OnModuleInit {
         reservationId,
         status,
         sender,
-        receiverIds: [sender.id, receiver.id],
+        receiverIds: [receiver.id],
         eventType: NotificationType.RESERVATION_UPDATE,
       });
     } catch (e) {

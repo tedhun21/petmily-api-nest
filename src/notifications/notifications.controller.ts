@@ -20,10 +20,23 @@ export class NotificationsController {
     // 알림 생성
     const newNotification = await this.notificationsService.create(payload);
 
-    // 웹소켓
+    console.log('event_pattern_newNotification', newNotification);
+
+    const { receivers, ...notificationWithoutReceivers } = newNotification;
+
+    const socketPayload = {
+      ...notificationWithoutReceivers,
+      readStatus: receivers.map((receiver) => ({
+        id: receiver.id,
+        isRead: false,
+        readAt: null,
+      })),
+    };
+
+    // 웹소켓 유저한테 알림 보내기
     this.notificationsGateway.sendNotificationsToUsers(
       payload.receiverIds,
-      newNotification,
+      socketPayload,
     );
   }
 
@@ -41,5 +54,11 @@ export class NotificationsController {
   @Put('read')
   updateNotificationReads(@AuthUser() jwtUser: JwtUser, @Body() body) {
     return this.notificationsService.updateNotificationRead(jwtUser, body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('unreadCount')
+  getUnreadCount(@AuthUser() jwtUser: JwtUser) {
+    return this.notificationsService.getUnreadCount(jwtUser);
   }
 }

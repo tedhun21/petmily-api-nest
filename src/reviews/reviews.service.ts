@@ -100,7 +100,7 @@ export class ReviewsService {
   async find(findReviewsInput: FindReviewsInput) {
     const { photo, page, pageSize } = findReviewsInput;
 
-    let whereCondition = {} as any;
+    const whereCondition = {} as any;
     if (photo === 'true') {
       whereCondition.photos = Not(IsNull());
     }

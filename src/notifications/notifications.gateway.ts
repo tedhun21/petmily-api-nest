@@ -9,7 +9,6 @@ import {
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Server, Socket } from 'socket.io';
 import { RedisService } from 'src/redis/redis.service';
-import { Notification } from './entity/notification.entity';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class NotificationsGateway implements OnGatewayInit {
@@ -62,10 +61,7 @@ export class NotificationsGateway implements OnGatewayInit {
     }
   }
 
-  async sendNotificationsToUsers(
-    userIds: number[],
-    notification: Notification,
-  ) {
+  async sendNotificationsToUsers(userIds: number[], notification: any) {
     // 웹 소켓 알림
     for (const userId of userIds) {
       this.server

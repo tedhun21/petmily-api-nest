@@ -4,7 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from 'src/users/entity/user.entity';
+import { User, UserRole } from 'src/users/entity/user.entity';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, LessThan, Not, Repository } from 'typeorm';
@@ -372,7 +372,7 @@ export class ChatsService {
     };
   }
 
-  // 메세지 저장 + unreadCount (트랜잭션)
+  // 트랜잭션 // 메세지 저장 & chatMember unreadCount & 유저 unread count 증가
   async createMessage(
     chatRoomId: number,
     user: { id: number; role: UserRole },
@@ -406,30 +406,22 @@ export class ChatsService {
         where: { chatRoom: { id: chatRoomId }, user: { id: Not(userId) } },
       });
 
-      // 4. 상대방의 unreadCount 증가
-      for (const chatMember of chatMembers) {
-        chatMember.unreadCount += 1;
-        await manager.save(chatMember);
-      }
+      // 4. 채팅방별 상대방 unreadCount 1증가 + 유저 개개인에 unreadChatCount 1증가
+      await Promise.all(
+        chatMembers.map(async (chatMember) => {
+          chatMember.unreadCount += 1;
+          await manager.save(chatMember);
+          await manager.increment(
+            User,
+            { id: chatMember.user.id },
+            'unreadChatCount',
+            1,
+          );
+        }),
+      );
 
       return savedMessage;
     });
-  }
-
-  async getUnreadCounts(jwtUser: JwtUser) {
-    const { id: userId } = jwtUser;
-
-    const chatMembers = await this.chatMembersRepository.find({
-      where: { user: { id: userId }, unreadCount: Not(0) },
-      relations: ['chatRoom'],
-    });
-
-    const unreadCounts = chatMembers.reduce(
-      (acc, chatMember) => acc + chatMember.unreadCount,
-      0,
-    );
-
-    return unreadCounts;
   }
 
   async updateUnreadCount(

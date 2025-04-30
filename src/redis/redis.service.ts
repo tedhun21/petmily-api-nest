@@ -172,35 +172,89 @@ export class RedisService implements OnModuleInit {
     return parseFloat(result);
   }
 
-  // 유저가 속한 모든 채팅방의 undreadCount 가져오기 (zset(sorted set) 구조로 count 값이 있는 것만 가져오기)
-  async getUserAllUnreadCounts(userId: number) {
-    const key = `user:${userId}:unreadRooms`;
-
-    // zrangebyscore로 unreadCount가 있는 채팅방만 가져오기 (score > 0)
-    const unreadChatRooms = await this.redisClient.zrangebyscore(
-      key,
-      1,
-      '+inf',
-    );
-    return unreadChatRooms;
-  }
-
-  // 유저의 채팅방에 대한 unreadCount 증가
-  async incrementUserUnreadCount(
+  // 유저 알림 unreadCount 카운트 증가 (String)
+  async incrementUnreadNotificationCount(
     userId: number,
-    chatRoomId: string,
-    count: number = 1,
-  ) {
-    const key = `user:${userId}:unreadRooms`;
+    increment = 1,
+  ): Promise<number> {
+    const key = `user:${userId}:unreadNotiCount`;
+    const result = await this.redisClient.incrby(key, increment);
 
-    await this.redisClient.zincrby(key, count, chatRoomId);
+    // 만료시간 설정 (1시간)
+    const ttl = 3600;
+    await this.redisClient.expire(key, ttl);
+
+    return result;
   }
 
-  // 유저의 채팅방에서 unreadCount 삭제
-  async deleteUserUnreadCount(userId: string, chatRoomId: string) {
-    const key = `user:${userId}:chatRoom:${chatRoomId}:unreadCount`;
+  async decrementUnreadNotificationCount(userId: number, decrement = 1) {
+    const key = `user:${userId}:unreadNotiCount`;
 
-    // 해당 유저의 unreadCount 키 삭제
-    await this.redisClient.del(key);
+    const exists = await this.redisClient.exists(key);
+    if (!exists) return;
+
+    await this.redisClient.decrby(key, decrement);
+
+    const currentCount = await this.getUserUnreadNotificationCount(userId);
+    if (currentCount < 0) {
+      await this.resetUserUnreadNotificationCount(userId); // 또는 this.setUserUnreadNotificationCount(userId, 0);
+    }
   }
+
+  // 유저 알림 수 초기화 (모두 읽음 처리)
+  async resetUserUnreadNotificationCount(userId: number) {
+    const key = `user:${userId}:unreadNotiCount`;
+    await this.redisClient.set(key, '0');
+
+    // 만료시간 설정 (1시간)
+    const ttl = 3600;
+    await this.redisClient.expire(key, ttl);
+  }
+
+  // 현재 안 읽은 알림 수 조회
+  async getUserUnreadNotificationCount(userId: number): Promise<number> {
+    const key = `user:${userId}:unreadNotiCount`;
+    const result = await this.redisClient.get(key);
+    return result ? parseInt(result) : 0;
+  }
+
+  //
+  async setUserUnreadNotificationCount(userId: number, count: number) {
+    const key = `user:${userId}:unreadNotiCount`;
+
+    const ttl = 3600;
+    await this.redisClient.set(key, count.toString(), 'EX', ttl); // 'EX' 초단위
+  }
+
+  // // 유저가 속한 모든 채팅방의 undreadCount 가져오기 (zset(sorted set) 구조로 count 값이 있는 것만 가져오기)
+  // async getUserAllUnreadCounts(userId: number) {
+  //   const key = `user:${userId}:unreadRooms`;
+
+  //   // zrangebyscore로 unreadCount가 있는 채팅방만 가져오기 (score > 0)
+  //   const unreadChatRooms = await this.redisClient.zrangebyscore(
+  //     key,
+  //     1,
+  //     '+inf',
+  //   );
+  //   return unreadChatRooms;
+  // }
+
+  // // 유저의 채팅방에 대한 unreadCount 증가
+  // async incrementUserUnreadCount(
+  //   userId: number,
+  //   chatRoomId: string,
+  //   count: number = 1,
+  // ) {
+  //   const key = `user:${userId}:unreadRooms`;
+
+  //   await this.redisClient.zincrby(key, count, chatRoomId);
+  // }
+
+  // // 유저의 채팅방에서 unreadCount 삭제
+  // async deleteUserUnreadCount(userId: string, chatRoomId: string) {
+  //   const key = `user:${userId}:chatRoom:${chatRoomId}:unreadCount`;
+
+  //   // 해당 유저의 unreadCount 키 삭제
+  //   await this.redisClient.del(key);
+  // }
 }

@@ -27,6 +27,7 @@ export class Notification extends CoreEntity {
   @OneToMany(
     () => NotificationRead,
     (notificationRead) => notificationRead.notification,
+    { onDelete: 'CASCADE' },
   )
   readStatus: NotificationRead[];
 }
