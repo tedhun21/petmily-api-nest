@@ -19,5 +19,5 @@ export class NotificationRead extends CoreEntity {
   isRead: boolean;
 
   @Column({ type: 'timestamp', nullable: true })
-  readAt: Date | null;
+  readAt: Date;
 }

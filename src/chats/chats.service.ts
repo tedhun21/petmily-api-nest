@@ -463,8 +463,6 @@ export class ChatsService {
   ) {
     const { id: userId } = jwtUser;
 
-    console.log('hi');
-
     const chatRoom = await this.chatRoomsRepository.findOne({
       where: { id: chatRoomId },
       relations: ['chatMembers', 'chatMembers.user'],

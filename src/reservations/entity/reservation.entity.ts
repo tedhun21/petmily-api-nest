@@ -27,7 +27,7 @@ export class Reservation extends CoreEntity {
   @Column({ type: 'date' })
   @IsDate()
   @Type(() => Date)
-  date: string;
+  date: Date;
 
   @Column({ type: 'time' })
   @IsString()
@@ -55,7 +55,7 @@ export class Reservation extends CoreEntity {
 
   @Column({ nullable: true })
   @IsString()
-  body?: string;
+  body: string;
 
   // 클라이언트 (예약을 생성한 사용자)
   @ManyToOne(() => User, (user) => user.clientReservations)

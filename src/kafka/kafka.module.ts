@@ -13,11 +13,11 @@ import { KafkaService } from './kafka.service';
           client: {
             clientId: 'notification',
             brokers: ['localhost:9092'],
-            retry: {
-              retries: 5, // 브로커 연결 재시도 횟수
-              initialRetryTime: 300, // 첫 번째 재시도 대기 시간
-              maxRetryTime: 1000, // 재시도 간격의 최대 시간
-            },
+            // retry: {
+            //   retries: 5, // 브로커 연결 재시도 횟수
+            //   initialRetryTime: 300, // 첫 번째 재시도 대기 시간
+            //   maxRetryTime: 1000, // 재시도 간격의 최대 시간
+            // },
           },
           consumer: { groupId: 'notification-consumer' },
         },

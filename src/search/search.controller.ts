@@ -18,4 +18,9 @@ export class SearchController {
   loctionByCount(@Query('size') size: string) {
     return this.searchSerivce.locationByCount(size);
   }
+
+  @Get('analyze')
+  analye(@Query('text') text: string) {
+    return this.searchSerivce.analyzeText('locations', text);
+  }
 }

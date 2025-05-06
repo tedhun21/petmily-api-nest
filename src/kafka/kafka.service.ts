@@ -10,7 +10,6 @@ import { ClientKafka } from '@nestjs/microservices';
 export class KafkaService implements OnModuleInit, OnModuleDestroy {
   private producer: ClientKafka | null = null;
   private consumer: ClientKafka | null = null;
-  private isKafkaConnected = false;
 
   constructor(
     @Inject('KAFKA_SERVICE') private readonly kafkaClient: ClientKafka,
@@ -23,11 +22,9 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       await this.producer.connect();
       await this.consumer.connect();
 
-      this.isKafkaConnected = true;
       console.log('✅ Kafka connected');
     } catch (error) {
       console.error('⚠️ Error initializing Kafka:', error);
-      this.isKafkaConnected = false;
     }
   }
 

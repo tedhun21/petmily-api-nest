@@ -15,25 +15,30 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  await app.listen(8080);
-  console.log('🚀 HTTP API Server running on port 8080');
-
-  const kafkaApp = await NestFactory.createMicroservice<MicroserviceOptions>(
-    AppModule,
-    {
-      transport: Transport.KAFKA,
-      options: {
-        client: {
-          brokers: ['localhost:9092'],
-        },
-        consumer: {
-          groupId: 'notification-consumer',
-        },
+  // Kafka 연결 설정
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.KAFKA,
+    options: {
+      client: {
+        brokers: ['localhost:9092'],
+      },
+      consumer: {
+        groupId: 'notification-consumer',
       },
     },
-  );
+  });
 
-  await kafkaApp.listen();
-  console.log('📡 Kafka Microservice is running...');
+  // 마이크로서비스 시작 시도
+  try {
+    await app.startAllMicroservices();
+    console.log('📡 Kafka Microservice is running...');
+  } catch (e) {
+    console.error('❌ Kafka connection failed:', e.message);
+    // 로그만 출력하고 종료시키지 않음
+  }
+
+  // HTTP API 서버는 항상 실행
+  await app.listen(8080);
+  console.log('🚀 HTTP API Server running on port 8080');
 }
 bootstrap();

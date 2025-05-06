@@ -9,7 +9,7 @@ export class Message extends CoreEntity {
   @Column()
   content: string;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'senderId' })
   sender: User;
 

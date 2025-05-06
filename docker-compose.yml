@@ -69,7 +69,7 @@ services:
     command: redis-server --appendonly yes # 데이터 영구 저장
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.4
+    image: elasticsearch:7.17.4
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
