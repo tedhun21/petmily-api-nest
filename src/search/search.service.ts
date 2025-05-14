@@ -69,24 +69,24 @@ export class SearchService implements OnModuleInit {
                 tokenizer: {
                   // 토큰화 도구: 텍스트를 단어/형태소 단위로 분해
                   nori_tokenizer: {
-                    type: 'nori_tokenizer', // 한국어 형태소 분석 // "셔울 용산구" -> ["서울", "용산구"]
+                    type: 'nori_tokenizer', // 한국어 형태소 분석 // "셔울 용산구" -> ["서울", "용산"] - "구"는 의미없는 조사로 판단하여 제거
                   },
                 },
                 filter: {
                   // 나눈 단어를 더 가공하는 도구 (토큰 후처리)
                   ngram_filter: {
                     // 단어를 중간에서 자르는 n-gram 필터 (부분 일치 검색용)
-                    // "용산구"
-                    // 2자 조합 (min_gram) ["용산", "산구"]
-                    // 3자 조합 (max_gram) ["용산구"]
+                    // "용산"
+                    // 2자 조합 (min_gram) ["용산"]
+                    // 3자 조합 (max_gram) []
                     type: 'ngram',
                     min_gram: 2,
                     max_gram: 3,
                   },
                   edge_ngram_filter: {
                     // 단어의 앞부분만 자르는 edge n-gram (자동완성용)
-                    // "용산구"
-                    // ["용", "용산", "용산구"]
+                    // "용산"
+                    // ["용", "용산"]
                     type: 'edge_ngram',
                     min_gram: 1,
                     max_gram: 5,

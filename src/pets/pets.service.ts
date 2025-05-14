@@ -97,11 +97,12 @@ export class PetsService {
   async update(
     jwtUser: JwtUser,
     params: { id: string },
-    updatePetInput: UpdatePetInput,
+    updatePetInput: UpdatePetInput & { deletePhoto: string },
     file: Express.Multer.File,
   ) {
     const { id: userId } = jwtUser;
     const { id: petId } = params;
+    const { deletePhoto } = updatePetInput;
 
     const pet = await this.petsRepository.findOne({
       where: { id: +petId, owner: { id: userId } },
@@ -111,24 +112,33 @@ export class PetsService {
       throw new NotFoundException('No pet found');
     }
 
-    let photoUrl = pet.photo;
-    // case 1: 현재 사진이 없는 상태, 새로운 사진 파일
-    if (!pet.photo && file) {
-      photoUrl = await this.uploadsService.uploadFile(file);
-    } else if (pet.photo && file) {
-      // case 2: 현재 사진 있는 상태, 새로운 사진 파일
+    // 사진 로직
+    let photo: string | null | undefined;
+    // undefined -> "아무것도 안 들어옴" (기존 URL 유지)
+    // null -> "삭제만 요청" (DB에 null 저장)
+    // string -> "새 URL" (새 이미지 URL 저장)
+
+    // file만 있을 때
+    if (file) {
+      photo = await this.uploadsService.uploadFile(file);
+
+      // 기존의 사진이 있다면 삭제
+      if (pet.photo) {
+        await this.uploadsService.deleteFile({ url: pet.photo });
+      }
+    }
+    // 삭제할 사진만 있을 때 (deletePhoto만 있을 때)
+    else if (deletePhoto) {
       await this.uploadsService.deleteFile({ url: pet.photo });
-      photoUrl = await this.uploadsService.uploadFile(file);
-    } else if (pet.photo && !file) {
-      // case 3: 사진 있는 상태에서 사진 지우기
-      await this.uploadsService.deleteFile({ url: pet.photo });
-      photoUrl = null;
+
+      photo = null;
     }
 
     const updateData = {
       ...pet,
       ...updatePetInput,
-      photo: photoUrl,
+      // photo가 undefined가 아닐 때만 필드에 포함
+      ...(photo !== undefined && { photo }),
     };
 
     try {

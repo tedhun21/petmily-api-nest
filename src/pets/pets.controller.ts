@@ -55,6 +55,7 @@ export class PetsController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     const parsedUpdatePetInput = JSON.parse(updatePetInput);
+    console.log('data', parsedUpdatePetInput);
     return this.petsService.update(jwtUser, params, parsedUpdatePetInput, file);
   }
 

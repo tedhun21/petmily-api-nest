@@ -176,12 +176,12 @@ export class UsersService {
   async update(
     params: ParamInput,
     jwtUser: JwtUser,
-    updateUserInput: UpdateUserInput,
+    updateUserInput: UpdateUserInput & { deletePhoto?: string },
     file: Express.Multer.File,
   ) {
     const { id } = params;
     const { id: userId, role: currentRole } = jwtUser;
-    const { password, role, ...updataData } = updateUserInput;
+    const { password, role, deletePhoto, ...updataData } = updateUserInput;
 
     if (userId !== +id) {
       throw new ForbiddenException(
@@ -197,11 +197,29 @@ export class UsersService {
       throw new NotFoundException('No user found');
     }
 
-    // 업데이트할 파일이 있다면
-    let photoUrl = null;
+    // 사진 로직
+    let photo: string | null | undefined;
+    // undefined -> "아무것도 안 들어옴" (기존 URL 유지)
+    // null -> "삭제만 요청" (DB에 null 저장)
+    // string -> "새 URL" (새 이미지 URL 저장)
+
+    // file만 있을 때
     if (file) {
-      photoUrl = await this.uploadsService.uploadFile(file);
+      photo = await this.uploadsService.uploadFile(file);
+
+      // 기존의 사진이 있다면 삭제
+      if (user.photo) {
+        await this.uploadsService.deleteFile({ url: user.photo });
+      }
     }
+    // 삭제할 사진만 있을 때 (deletePhoto만 있을 때)
+    else if (deletePhoto) {
+      await this.uploadsService.deleteFile({ url: deletePhoto });
+
+      photo = null;
+    }
+    // 3. 아무것도 안 들어올 경우
+    // => 기존의 photoUrl을 그대로 사용
 
     // role을 업데이트 했을때 jwt업데이트
     let newJwt = null;
@@ -218,7 +236,8 @@ export class UsersService {
       ...user,
       ...updataData,
       role,
-      ...(photoUrl && { photo: photoUrl }),
+      // photo가 undefined가 아닐 때만 필드에 포함
+      ...(photo !== undefined && { photo }),
     };
 
     const updatedUser = await this.usersRepository.save(updateUserData);
