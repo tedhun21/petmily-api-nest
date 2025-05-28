@@ -1,11 +1,35 @@
-import { PickType } from '@nestjs/mapped-types';
-import { Pet } from '../entity/pet.entity';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { PetGender, PetSpecies } from '../entity/pet.entity';
 
-export class CreatePetInput extends PickType(Pet, [
-  'name',
-  'species',
-  'breed',
-  'age',
-  'weight',
-  'body',
-]) {}
+export class CreatePetDto {
+  @IsString()
+  name: string;
+
+  @IsEnum(PetSpecies)
+  species: PetSpecies;
+
+  @IsEnum(PetGender)
+  gender: PetGender;
+
+  @IsString()
+  breed: string;
+
+  @IsNumber()
+  age: number;
+
+  @IsNumber()
+  weight: number;
+
+  @IsBoolean()
+  neutering: boolean;
+
+  @IsOptional()
+  @IsString()
+  body?: string;
+}

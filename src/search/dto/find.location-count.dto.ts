@@ -1,12 +1,8 @@
 import { Type } from 'class-transformer';
 import { IsNumber } from 'class-validator';
 
-export class PaginationDto {
+export class FindLocationCountDto {
   @Type(() => Number)
   @IsNumber()
-  page: number;
-
-  @Type(() => Number)
-  @IsNumber()
-  pageSize: number;
+  size: number;
 }

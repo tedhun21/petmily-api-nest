@@ -1,4 +1,9 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { Reservation } from '../entity/reservation.entity';
+import { CreateReservationDto } from './create.reservation.dto';
+import { ReservationStatus } from '../entity/reservation.entity';
+import { IsEnum } from 'class-validator';
 
-export class UpdateReservationInput extends PartialType(Reservation) {}
+export class UpdateReservationDto extends PartialType(CreateReservationDto) {
+  @IsEnum(ReservationStatus)
+  status?: ReservationStatus;
+}

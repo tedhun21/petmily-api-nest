@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -12,28 +13,30 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserInput } from './dto/create.user.dto';
+import { CreateUserDto } from './dto/create.user.dto';
 import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
-import { UpdateUserInput } from './dto/update.user.dto';
-import { ParamInput } from 'src/common/dto/param.dto';
+import { UpdateUserDto } from './dto/update.user.dto';
+import { ParamDto } from 'src/common/dto/param.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { FindPossiblePetsittersInput } from './dto/findPossible.petsitter.dto';
+import { FindPossiblePetsittersDto } from './dto/find.petsitterPossible.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UpdateFavoriteInput } from './dto/updateFavorite.user';
-// import { RecentSearchInput } from './dto/updateRecent.user';
+import { UpdateFavoriteDto } from './dto/updateFavorite.user';
+import { FindUserByEmailOrNicknameDto } from './dto/find.petsitterByNickname.dto';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
   @Post()
-  create(@Body() createUserInput: CreateUserInput) {
-    return this.usersService.create(createUserInput);
+  create(@Body() createUserDto: CreateUserDto) {
+    return this.usersService.create(createUserDto);
   }
 
   @Get()
-  findByEmailOrNickname(@Query('q') EmailOrNickname: string) {
-    return this.usersService.findByEmailOrNickname(EmailOrNickname);
+  findByEmailOrNickname(@Query() query: FindUserByEmailOrNicknameDto) {
+    return this.usersService.findByEmailOrNickname(query);
   }
 
   @Get('by-ids')
@@ -59,32 +62,40 @@ export class UsersController {
   @Put('me/favorites')
   updateFavorite(
     @AuthUser() jwtUser: JwtUser,
-    @Body() updateFavoriteInput: UpdateFavoriteInput,
+    @Body() updateFavoriteDto: UpdateFavoriteDto,
   ) {
-    return this.usersService.updateFavorite(jwtUser, updateFavoriteInput);
+    return this.usersService.updateFavorite(jwtUser, updateFavoriteDto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Put(':id')
   @UseInterceptors(FileInterceptor('file'))
-  update(
-    @Param() params: ParamInput,
+  async update(
+    @Param() paramDto: ParamDto,
     @AuthUser() jwtUser: JwtUser,
-    @Body('data') updateUserInput: string,
+    @Body('data') updateUserDto: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const parsedUpdateUserInput: UpdateUserInput = JSON.parse(updateUserInput);
-    return this.usersService.update(
-      params,
-      jwtUser,
-      parsedUpdateUserInput,
-      file,
-    );
+    const dto = plainToInstance(UpdateUserDto, JSON.parse(updateUserDto));
+    const errors = await validate(dto);
+
+    if (errors.length > 0) {
+      const formattedErrors = errors.map((err) => ({
+        property: err.property,
+        constraints: err.constraints,
+      }));
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: formattedErrors,
+      });
+    }
+
+    return this.usersService.update(paramDto, jwtUser, dto, file);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  delete(@Param() params: ParamInput, @AuthUser() jwtUser: JwtUser) {
+  delete(@Param() params: ParamDto, @AuthUser() jwtUser: JwtUser) {
     return this.usersService.delete(params, jwtUser);
   }
 
@@ -99,11 +110,9 @@ export class UsersController {
 
   @Get('petsitters/possible')
   findPossiblePetsitters(
-    @Query() findPossiblePetsittersInput: FindPossiblePetsittersInput,
+    @Query() findPossiblePetsittersDto: FindPossiblePetsittersDto,
   ) {
-    return this.usersService.findPossiblePetsitters(
-      findPossiblePetsittersInput,
-    );
+    return this.usersService.findPossiblePetsitters(findPossiblePetsittersDto);
   }
 
   @UseGuards(JwtAuthGuard)

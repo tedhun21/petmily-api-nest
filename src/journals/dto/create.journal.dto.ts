@@ -1,6 +1,9 @@
-import { PickType } from '@nestjs/mapped-types';
-import { Journal } from '../entity/journal.entity';
+import { IsNumber, IsString } from 'class-validator';
 
-export class CreateJournalInput extends PickType(Journal, ['body']) {
+export class CreateJournalDto {
+  @IsNumber()
   reservationId: number;
+
+  @IsString()
+  body: string;
 }

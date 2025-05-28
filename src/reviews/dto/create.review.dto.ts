@@ -1,6 +1,14 @@
-import { PickType } from '@nestjs/mapped-types';
-import { Review } from '../entity/review.entity';
+import { IsNumber, IsString, Max, Min } from 'class-validator';
 
-export class CreateReviewInput extends PickType(Review, ['body', 'star']) {
+export class CreateReviewDto {
+  @IsNumber()
   reservationId: number;
+
+  @IsString()
+  body: string;
+
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  star: number;
 }

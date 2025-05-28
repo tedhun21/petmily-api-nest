@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -16,6 +17,11 @@ import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JournalsService } from './journals.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { ParamDto } from 'src/common/dto/param.dto';
+import { plainToInstance } from 'class-transformer';
+import { CreateJournalDto } from './dto/create.journal.dto';
+import { validate } from 'class-validator';
+import { UpdateJournalDto } from './dto/update.journal.dto';
 
 @Controller('journals')
 export class JournalsController {
@@ -24,18 +30,27 @@ export class JournalsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   @UseInterceptors(FilesInterceptor('files'))
-  create(
+  async create(
     @AuthUser() jwtUser: JwtUser,
-    @Body('data') createJournalInput: string,
+    @Body('data') createJournalDto: string,
     @UploadedFiles() files: Array<Express.Multer.File>,
   ) {
-    const parsedCreateJournalInput = JSON.parse(createJournalInput);
+    const dto = plainToInstance(CreateJournalDto, createJournalDto);
 
-    return this.journalsService.create(
-      jwtUser,
-      parsedCreateJournalInput,
-      files,
-    );
+    const errors = await validate(dto);
+
+    if (errors.length > 0) {
+      const formattedErrors = errors.map((err) => ({
+        property: err.property,
+        constraints: err.constraints,
+      }));
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: formattedErrors,
+      });
+    }
+
+    return this.journalsService.create(jwtUser, dto, files);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -46,34 +61,40 @@ export class JournalsController {
 
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findOne(@AuthUser() jwtUser: JwtUser, @Param() params: { id: string }) {
-    return this.journalsService.findOne(jwtUser, params);
+  findOne(@AuthUser() jwtUser: JwtUser, @Param() paramDto: ParamDto) {
+    return this.journalsService.findOne(jwtUser, paramDto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Put(':id')
   @UseInterceptors(FilesInterceptor('files'))
-  update(
+  async update(
     @AuthUser() jwtUser: JwtUser,
     @Param() params: { id: string },
-    @Body('data') updateJournalInput: string,
+    @Body('data') updateJournalDto: string,
     @UploadedFiles() files: Array<Express.Multer.File>,
   ) {
-    const parsedUpdateJournalInput = JSON.parse(updateJournalInput);
-    return this.journalsService.update(
-      jwtUser,
-      params,
-      parsedUpdateJournalInput,
-      files,
-    );
+    const dto = plainToInstance(UpdateJournalDto, updateJournalDto);
+
+    const errors = await validate(dto);
+
+    if (errors.length > 0) {
+      const formattedErrors = errors.map((err) => ({
+        property: err.property,
+        constraints: err.constraints,
+      }));
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: formattedErrors,
+      });
+    }
+
+    return this.journalsService.update(jwtUser, params, dto, files);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  delete(
-    @AuthUser() jwtUser: JwtUser,
-    @Param() params: { id: string | number },
-  ) {
-    return this.journalsService.delete(jwtUser, params);
+  delete(@AuthUser() jwtUser: JwtUser, @Param() paramDto: ParamDto) {
+    return this.journalsService.delete(jwtUser, paramDto);
   }
 }

@@ -72,13 +72,13 @@ export class ReservationsGateWay implements OnGatewayInit {
       const decoded = await this.jwtService.verify(token);
       const { id: userId, role: userRole } = decoded;
 
-      // 1. 예약 업데이트 & 카프카 알림
+      // 1. 예약 업데이트
       await this.reservationsService.updateAndNotify(reservationId, newStatus, {
         id: userId,
         role: userRole,
       });
 
-      // 2. 웹소켓 채널로 상태 변경 전송
+      // 2. 웹소켓 채널로 상태 변경 전송 (to 프론트)
       this.server
         .to(`reservation_${reservationId.toString()}`)
         .emit('listenStatus', { newStatus });

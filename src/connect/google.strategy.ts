@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Profile, Strategy, VerifyCallback } from 'passport-google-oauth20';
-import { UserRole } from 'src/users/entity/user.entity';
+import { Provider, UserRole } from 'src/users/entity/user.entity';
 import { UsersService } from 'src/users/users.service';
 
 @Injectable()
@@ -23,7 +23,6 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   ) {
     const email = profile.emails[0].value;
     const username = profile.displayName;
-    const provider = profile.provider;
 
     try {
       // 유저가 이미 존재하는지 확인
@@ -38,9 +37,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         const newUser = await this.usersService.create({
           email,
           username,
-          provider,
+          nickname: username,
+          provider: Provider.GOOGLE,
           verified: true,
-          role: UserRole.USER, // 기본적으로 User 상태로 설정
+          role: UserRole.USER,
         });
 
         done(null, newUser);

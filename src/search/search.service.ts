@@ -3,6 +3,8 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { getLocations } from 'src/common/location/location.utils';
 import { RedisService } from 'src/redis/redis.service';
+import { SearchDto } from './dto/find.search.dto';
+import { FindLocationCountDto } from './dto/find.location-count.dto';
 @Injectable()
 export class SearchService implements OnModuleInit {
   constructor(
@@ -143,11 +145,12 @@ export class SearchService implements OnModuleInit {
   }
 
   // elastic - search (찾기)
-  async searchData(indexName: string, query: string, size?: string) {
+  async searchData(searchDto: SearchDto) {
+    const { index, query, size } = searchDto;
     const [field, value] = query.split(':');
 
     const response = await this.elasticsearchService.search({
-      index: indexName,
+      index,
       body: {
         query: { match: { [field]: value } },
         ...(size && { size: +size }),
@@ -182,7 +185,8 @@ export class SearchService implements OnModuleInit {
   }
 
   // redis
-  async locationByCount(size: string) {
+  async locationByCount(findLocationCountDto: FindLocationCountDto) {
+    const { size } = findLocationCountDto;
     const topDistricts = await this.redisService.getLocationKey(+size);
 
     // 점수 제거 (짝수 인덱스만 가져오기)

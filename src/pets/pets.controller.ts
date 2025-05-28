@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,27 +12,46 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { CreatePetInput } from './dto/create.pet.dto';
+import { CreatePetDto } from './dto/create.pet.dto';
 import { PetsService } from './pets.service';
 
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { ParamDto } from 'src/common/dto/param.dto';
+import { UpdatePetDto } from './dto/update.pet.dto';
 
 @Controller('pets')
 export class PetsController {
   constructor(private readonly petsService: PetsService) {}
+
   @UseGuards(JwtAuthGuard)
   @Post()
   @UseInterceptors(FileInterceptor('file'))
-  create(
+  async create(
     @AuthUser() jwtUser: JwtUser,
-    @Body('data') createPetInput: string,
+    @Body('data') createPetDto: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const parsedCreatePetInput: CreatePetInput = JSON.parse(createPetInput);
-    return this.petsService.create(jwtUser, parsedCreatePetInput, file);
+    const dto = plainToInstance(CreatePetDto, JSON.parse(createPetDto));
+
+    const errors = await validate(dto);
+
+    if (errors.length > 0) {
+      const formattedErrors = errors.map((err) => ({
+        property: err.property,
+        constraints: err.constraints,
+      }));
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: formattedErrors,
+      });
+    }
+
+    return this.petsService.create(jwtUser, dto, file);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -41,27 +61,40 @@ export class PetsController {
   }
 
   @Get(':id')
-  findOne(@Param() params: { id: string }) {
-    return this.petsService.findOne(params);
+  findOne(@Param() paramDto: ParamDto) {
+    return this.petsService.findOne(paramDto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Put(':id')
   @UseInterceptors(FileInterceptor('file'))
-  update(
+  async update(
     @AuthUser() jwtUser: JwtUser,
-    @Param() params: { id: string },
-    @Body('data') updatePetInput: string,
+    @Param() paramDto: ParamDto,
+    @Body('data') updatePetDto: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const parsedUpdatePetInput = JSON.parse(updatePetInput);
-    console.log('data', parsedUpdatePetInput);
-    return this.petsService.update(jwtUser, params, parsedUpdatePetInput, file);
+    const dto = plainToInstance(UpdatePetDto, JSON.parse(updatePetDto));
+
+    const errors = await validate(dto);
+
+    if (errors.length > 0) {
+      const formattedErrors = errors.map((err) => ({
+        property: err.property,
+        constraints: err.constraints,
+      }));
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: formattedErrors,
+      });
+    }
+
+    return this.petsService.update(jwtUser, paramDto, dto, file);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  delete(@AuthUser() jwtUser: JwtUser, @Param() params: { id: string }) {
-    return this.petsService.delete(jwtUser, params);
+  delete(@AuthUser() jwtUser: JwtUser, @Param() paramDto: ParamDto) {
+    return this.petsService.delete(jwtUser, paramDto);
   }
 }

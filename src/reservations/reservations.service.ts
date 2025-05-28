@@ -6,21 +6,22 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { CreateReservationInput } from './dto/create.reservation.dto';
+import { CreateReservationDto } from './dto/create.reservation.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import {
   Between,
   EntityManager,
+  Equal,
   LessThan,
   MoreThan,
   Repository,
 } from 'typeorm';
 import { Reservation, ReservationStatus } from './entity/reservation.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { UpdateReservationInput } from './dto/update.reservation.dto';
+import { UpdateReservationDto } from './dto/update.reservation.dto';
 import { FindReservationsDto } from './dto/find.reservation.dto';
 import { User, UserRole } from 'src/users/entity/user.entity';
-import { ParamInput } from 'src/common/dto/param.dto';
+import { ParamDto } from 'src/common/dto/param.dto';
 import { ClientKafka } from '@nestjs/microservices';
 import { KafkaService } from 'src/kafka/kafka.service';
 import { NotificationType } from 'src/notifications/entity/notification.entity';
@@ -41,17 +42,14 @@ export class ReservationsService implements OnModuleInit {
     this.producer = this.kafkaService.getProducer();
   }
 
-  async create(
-    jwtUser: JwtUser,
-    createReservationInput: CreateReservationInput,
-  ) {
+  async create(jwtUser: JwtUser, createReservationDto: CreateReservationDto) {
     const { id: userId } = jwtUser;
     const { date, startTime, endTime, petsitterId, petIds } =
-      createReservationInput;
+      createReservationDto;
 
     const existingReservation = await this.reservationsRepository.findOne({
       where: {
-        date,
+        date: new Date(date),
         client: { id: userId },
         petsitter: { id: petsitterId },
         startTime: LessThan(endTime),
@@ -67,10 +65,11 @@ export class ReservationsService implements OnModuleInit {
 
     try {
       const reservation = this.reservationsRepository.create({
-        ...createReservationInput,
+        ...createReservationDto,
         petsitter: { id: petsitterId },
         client: { id: userId },
         pets: petIds.map((id) => ({ id })),
+        status: ReservationStatus.PENDING,
       });
 
       const createdReservation =
@@ -102,11 +101,19 @@ export class ReservationsService implements OnModuleInit {
     }
 
     if (date) {
-      const startDate = new Date(date);
-      const endDate = new Date(date);
-      endDate.setMonth(endDate.getMonth() + 1);
+      // 월단위 YYYY-MM
+      if (/^\d{4}-\d{2}$/.test(date)) {
+        const startDate = new Date(date);
+        const endDate = new Date(date);
+        endDate.setMonth(endDate.getMonth() + 1);
 
-      whereCondition.date = Between(startDate, endDate);
+        whereCondition.date = Between(startDate, endDate);
+      }
+      // 일단위 YYYY-MM-DD
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const targetDate = new Date(date);
+        whereCondition.date = Equal(targetDate);
+      }
     }
 
     if (status) {
@@ -164,7 +171,7 @@ export class ReservationsService implements OnModuleInit {
     }
   }
 
-  async findOne(jwtUser: JwtUser, params: ParamInput) {
+  async findOne(jwtUser: JwtUser, params: ParamDto) {
     const { id: userId } = jwtUser;
     const { id: reservationId } = params;
 
@@ -212,12 +219,12 @@ export class ReservationsService implements OnModuleInit {
 
   async update(
     jwtUser: JwtUser,
-    params: ParamInput,
-    updateReservationInput: UpdateReservationInput,
+    params: ParamDto,
+    updateReservationDto: UpdateReservationDto,
   ) {
     const { id: userId } = jwtUser;
     const { id: reservationId } = params;
-    const { status } = updateReservationInput;
+    const { status } = updateReservationDto;
 
     const reservation = await this.reservationsRepository.findOne({
       where: { id: +reservationId },
@@ -239,8 +246,8 @@ export class ReservationsService implements OnModuleInit {
 
     // 트랜잭션 시작
     return this.entityManager.transaction(async (manager) => {
-      // 예약 상태 'Completed'로 변경 시 펫시터 업데이트
-      if (status === 'Completed') {
+      // 예약 상태 'completed'로 변경 시 펫시터 업데이트
+      if (status === ReservationStatus.COMPLETED) {
         await manager.update(User, reservation.petsitter.id, {
           completedReservationsCount: () => 'completedReservationsCount + 1',
         });
@@ -249,7 +256,7 @@ export class ReservationsService implements OnModuleInit {
       // 예약 업데이트 데이터 생성
       const updateReservationData = {
         ...reservation,
-        ...updateReservationInput,
+        ...updateReservationDto,
       };
 
       try {
@@ -270,7 +277,7 @@ export class ReservationsService implements OnModuleInit {
     });
   }
 
-  async getReservationWithReview(jwtUser: JwtUser, param: ParamInput) {
+  async getReservationWithReview(jwtUser: JwtUser, param: ParamDto) {
     const { id: userId } = jwtUser;
     const { id: reservationId } = param;
 
@@ -291,7 +298,7 @@ export class ReservationsService implements OnModuleInit {
     }
   }
 
-  async getReservationWithJournal(jwtUser: JwtUser, param: ParamInput) {
+  async getReservationWithJournal(jwtUser: JwtUser, param: ParamDto) {
     const { id: userId } = jwtUser;
     const { id: reservationId } = param;
 
@@ -310,27 +317,6 @@ export class ReservationsService implements OnModuleInit {
     } catch (e) {
       throw new InternalServerErrorException('Fail to fetch journal');
     }
-  }
-
-  async findByPetsitterForDay(param, query) {
-    const { id: petsitterId } = param;
-    const { date } = query;
-
-    const whereCondition = { petsitter: { id: petsitterId } } as any;
-
-    if (date) {
-      const targetDate = new Date(date);
-      targetDate.setHours(0, 0, 0, 0); // 날짜만 비교할 경우 시간 초기화
-
-      whereCondition.date = targetDate; // 같은 날짜로 조건 설정
-    }
-
-    const reservations = await this.reservationsRepository.find({
-      where: whereCondition,
-      select: ['id', 'date', 'startTime', 'endTime'],
-    });
-
-    return reservations;
   }
 
   async findMonthWithReservation(jwtUser: JwtUser) {
@@ -394,13 +380,18 @@ export class ReservationsService implements OnModuleInit {
           ? reservation.client
           : reservation.petsitter;
 
-      // 2️⃣ Kafka 이벤트 전송 (비동기)
+      // 2️⃣ Kafka 이벤트 전송
       await this.producer.emit('reservation-update', {
-        reservationId,
-        status,
-        sender,
+        referenceId: reservationId,
+        senderId: sender.id,
         receiverIds: [receiver.id],
-        eventType: NotificationType.RESERVATION_UPDATE,
+        type: NotificationType.RESERVATION_UPDATE,
+
+        metadata: {
+          reservationId,
+          newStatus: status,
+          sender: { id: sender.id, nickname: sender.nickname },
+        },
       });
     } catch (e) {
       console.error('Error updating reservation:', e);

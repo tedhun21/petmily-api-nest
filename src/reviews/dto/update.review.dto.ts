@@ -1,6 +1,10 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { Review } from '../entity/review.entity';
+import { CreateReviewDto } from './create.review.dto';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
-export class UpdateReviewInput extends PartialType(Review) {
-  deleteFiles: string[];
+export class UpdateReviewDto extends PartialType(CreateReviewDto) {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  deletePhotos?: string[];
 }

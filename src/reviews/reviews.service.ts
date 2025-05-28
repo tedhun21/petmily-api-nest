@@ -8,16 +8,18 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
-import { CreateReviewInput } from './dto/create.review.dto';
+import { CreateReviewDto } from './dto/create.review.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Review } from './entity/review.entity';
 import { EntityManager, IsNull, Not, Repository } from 'typeorm';
 import { ReservationsService } from 'src/reservations/reservations.service';
-import { ParamInput } from 'src/common/dto/param.dto';
-import { UpdateReviewInput } from './dto/update.review.dto';
-import { FindReviewsInput } from './dto/find.review.dto';
+import { ParamDto } from 'src/common/dto/param.dto';
+import { UpdateReviewDto } from './dto/update.review.dto';
+import { FindReviewsDto } from './dto/find.review.dto';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { UsersService } from 'src/users/users.service';
+import { UserRole } from 'src/users/entity/user.entity';
+import { ReservationStatus } from 'src/reservations/entity/reservation.entity';
 
 @Injectable()
 export class ReviewsService {
@@ -32,11 +34,11 @@ export class ReviewsService {
 
   async create(
     jwtUser: JwtUser,
-    createReviewInput: CreateReviewInput,
+    createReviewDto: CreateReviewDto,
     files: Array<Express.Multer.File>,
   ) {
     const { id: userId, role } = jwtUser;
-    const { reservationId, star } = createReviewInput;
+    const { reservationId, star } = createReviewDto;
 
     const reservation = await this.reservationsService.findOne(jwtUser, {
       id: reservationId,
@@ -50,13 +52,13 @@ export class ReviewsService {
       throw new ConflictException('Review already exists for this reservation');
     }
 
-    if (role !== 'Client' || reservation.client.id !== userId) {
+    if (role !== UserRole.CLIENT || reservation.client.id !== userId) {
       throw new UnauthorizedException(
         "You don't have permission to create a review",
       );
     }
 
-    if (reservation.status !== 'Completed') {
+    if (reservation.status !== ReservationStatus.COMPLETED) {
       throw new UnprocessableEntityException(
         'Cannot create a review unless the reservation is completed',
       );
@@ -74,7 +76,7 @@ export class ReviewsService {
       try {
         // ✅ 트랜잭션 내에서 review 객체 생성
         const review = manager.create(Review, {
-          ...createReviewInput,
+          ...createReviewDto,
           reservation: { id: reservationId },
           ...(photoUrls.length > 0 && { photos: photoUrls }),
         });
@@ -97,12 +99,14 @@ export class ReviewsService {
     });
   }
 
-  async find(findReviewsInput: FindReviewsInput) {
-    const { photo, page, pageSize } = findReviewsInput;
+  async find(findReviewsDto: FindReviewsDto) {
+    const { photo, page, pageSize } = findReviewsDto;
 
     const whereCondition = {} as any;
-    if (photo === 'true') {
-      whereCondition.photos = Not(IsNull());
+    if (photo === true) {
+      whereCondition.photos = Not(IsNull()); // 사진 있는 리뷰만
+    } else if (photo === false) {
+      whereCondition.photos = IsNull(); // 사진 없는 리뷰만
     }
 
     try {
@@ -136,7 +140,7 @@ export class ReviewsService {
     }
   }
 
-  async findOne(params: ParamInput) {
+  async findOne(params: ParamDto) {
     const { id: reviewId } = params;
 
     try {
@@ -156,13 +160,13 @@ export class ReviewsService {
 
   async update(
     jwtUser: JwtUser,
-    params: ParamInput,
-    updateReviewInput: UpdateReviewInput,
+    params: ParamDto,
+    updateReviewDto: UpdateReviewDto,
     files: Array<Express.Multer.File>,
   ) {
     const { id: userId, role } = jwtUser;
     const { id: reviewId } = params;
-    const { deleteFiles, star, body } = updateReviewInput;
+    const { deletePhotos, star, body } = updateReviewDto;
 
     // 트랜잭션 적용
     return this.entityManager.transaction(async (manager) => {
@@ -179,7 +183,7 @@ export class ReviewsService {
 
       const { client } = review.reservation;
       // 예약에서 Client가 같지 않으면 에러
-      if (role !== 'Client' && client.id !== userId) {
+      if (role !== UserRole.CLIENT && client.id !== userId) {
         throw new UnauthorizedException(
           "You don't have permission to update the review",
         );
@@ -187,15 +191,15 @@ export class ReviewsService {
 
       review.photos = review.photos ?? [];
       // 삭제할 파일 처리
-      if (deleteFiles && deleteFiles.length > 0) {
+      if (deletePhotos && deletePhotos.length > 0) {
         await Promise.all(
-          deleteFiles.map(
+          deletePhotos.map(
             async (file) => await this.uploadsService.deleteFile({ url: file }),
           ),
         );
 
         review.photos = review.photos.filter(
-          (url: string) => !deleteFiles.includes(url),
+          (url: string) => !deletePhotos.includes(url),
         );
       }
 
@@ -231,9 +235,9 @@ export class ReviewsService {
     });
   }
 
-  async delete(jwtUser: JwtUser, params: ParamInput) {
+  async delete(jwtUser: JwtUser, paramDto: ParamDto) {
     const { id: userId, role } = jwtUser;
-    const { id: reviewId } = params;
+    const { id: reviewId } = paramDto;
 
     const review = await this.reviewsRepository.findOne({
       where: { id: +reviewId },
@@ -246,7 +250,7 @@ export class ReviewsService {
     }
 
     const { client } = review.reservation;
-    if (role !== 'Client' || client.id !== userId) {
+    if (role !== UserRole.CLIENT || client.id !== userId) {
       throw new ForbiddenException(
         "You don't have permission to delete the review",
       );

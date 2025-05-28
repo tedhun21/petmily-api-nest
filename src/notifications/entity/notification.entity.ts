@@ -1,6 +1,14 @@
 import { CoreEntity } from 'src/common/entity/core.entity';
 import { User } from 'src/users/entity/user.entity';
-import { Column, Entity, JoinTable, ManyToMany, OneToMany } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  JoinTable,
+  ManyToMany,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm';
 import { NotificationRead } from './notification_read.entity';
 
 export enum NotificationType {
@@ -11,14 +19,12 @@ export enum NotificationType {
 
 @Entity('notifications')
 export class Notification extends CoreEntity {
-  @Column({ type: 'text' })
-  message: string;
-
   @Column({ type: 'enum', enum: NotificationType })
   type: NotificationType;
 
-  @Column({ nullable: true })
-  senderId: number;
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'senderId' })
+  sender?: User;
 
   @ManyToMany(() => User, (user) => user.receivedNotifications)
   @JoinTable()
@@ -30,4 +36,7 @@ export class Notification extends CoreEntity {
     { onDelete: 'CASCADE' },
   )
   readStatus: NotificationRead[];
+
+  @Column({ type: 'jsonb', nullable: true })
+  metadata?: Record<string, any>;
 }

@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { Notification, NotificationType } from './entity/notification.entity';
+import { Notification } from './entity/notification.entity';
 import { NotificationRead } from './entity/notification_read.entity';
 import { User } from 'src/users/entity/user.entity';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { RedisService } from 'src/redis/redis.service';
-import { NotificationsGateway } from './notifications.gateway';
+import { CreateNotificationDto } from './dto/create.notification.dto';
 
 @Injectable()
 export class NotificationsService {
@@ -16,7 +16,6 @@ export class NotificationsService {
     private readonly notificationsRepository: Repository<Notification>,
     @InjectRepository(NotificationRead)
     private readonly notificationReadsRepository: Repository<NotificationRead>,
-    private readonly notificationsGateway: NotificationsGateway,
     private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
   ) {}
@@ -24,35 +23,23 @@ export class NotificationsService {
   // 트랜잭션
   // 1. notification 생성
   // 2. notication_read 생성
-  // 유저 unread count (redis) 증가
-  async create(payload: {
-    reservationId: number;
-    sender: { id: number; nickname: string };
-    receiverIds: number[];
-    eventType: NotificationType;
-    status: string;
-  }) {
-    let message = '';
-
-    switch (payload.eventType) {
-      case NotificationType.RESERVATION_UPDATE:
-        message = `예약번호 ${payload.reservationId} 예약이 ${payload.status} 상태로 변경됐습니다.`;
-        break;
-    }
+  // 트랙잭션 후, 유저 unread count (redis) 증가
+  async create(createNotificationDto: CreateNotificationDto) {
+    const { senderId, receiverIds, type, metadata } = createNotificationDto;
 
     const notification = await this.dataSource.transaction(async (manager) => {
       const receivers = await manager
         .createQueryBuilder(User, 'user')
         .select(['user.id', 'user.nickname'])
-        .whereInIds(payload.receiverIds)
+        .whereInIds(receiverIds)
         .getMany();
 
       // Notification 생성
       const notification = manager.create(Notification, {
         receivers,
-        senderId: payload.sender.id,
-        type: payload.eventType,
-        message,
+        senderId,
+        type,
+        metadata,
       });
 
       await manager.save(Notification, notification);
@@ -61,7 +48,7 @@ export class NotificationsService {
       const notificationReads = [
         manager.create(NotificationRead, {
           notification,
-          user: { id: payload.sender.id },
+          user: { id: senderId },
           isRead: true,
         }), // sender는 바로 읽음 처리
         ...receivers.map((receiver) =>
@@ -75,7 +62,7 @@ export class NotificationsService {
     });
 
     // Redis에 sender와 receiverIds에 해당하는 각 유저들의 unread count 증가 (트랜잭션 성공 후)
-    const allUserIds = [payload.sender.id, ...payload.receiverIds];
+    const allUserIds = [senderId, ...receiverIds];
 
     await Promise.all(
       allUserIds.map((id) =>

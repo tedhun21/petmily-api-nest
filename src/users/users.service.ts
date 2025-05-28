@@ -9,19 +9,20 @@ import {
 import { Brackets, EntityManager, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User, UserRole } from './entity/user.entity';
-import { CreateUserInput } from './dto/create.user.dto';
+import { CreateUserDto } from './dto/create.user.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
-import { UpdateUserInput } from './dto/update.user.dto';
+import { UpdateUserDto } from './dto/update.user.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { FindPossiblePetsittersInput } from './dto/findPossible.petsitter.dto';
+import { FindPossiblePetsittersDto } from './dto/find.petsitterPossible.dto';
 import { ReservationsService } from 'src/reservations/reservations.service';
-import { ParamInput } from 'src/common/dto/param.dto';
+import { ParamDto } from 'src/common/dto/param.dto';
 import { ReservationStatus } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { JwtService } from '@nestjs/jwt';
-import { UpdateFavoriteInput } from './dto/updateFavorite.user';
+import { UpdateFavoriteDto } from './dto/updateFavorite.user';
 import { RedisService } from 'src/redis/redis.service';
 import { isValidLocation } from 'src/common/location/location.utils';
+import { FindUserByEmailOrNicknameDto } from './dto/find.petsitterByNickname.dto';
 
 @Injectable()
 export class UsersService {
@@ -34,8 +35,8 @@ export class UsersService {
     private readonly redisService: RedisService,
   ) {}
 
-  async create(createUserInput: CreateUserInput) {
-    const { email, nickname } = createUserInput;
+  async create(createUserDto: CreateUserDto) {
+    const { email, nickname } = createUserDto;
 
     const existingEmail = await this.usersRepository.findOne({
       where: { email },
@@ -63,7 +64,7 @@ export class UsersService {
       });
     }
 
-    const user = this.usersRepository.create(createUserInput);
+    const user = this.usersRepository.create(createUserDto);
 
     try {
       const newUser = await this.usersRepository.save(user);
@@ -88,12 +89,13 @@ export class UsersService {
     return users;
   }
 
-  async findByEmailOrNickname(EmailOrNickname: string) {
+  async findByEmailOrNickname(
+    findUserByEmailOrNicknameDto: FindUserByEmailOrNicknameDto,
+  ) {
+    const { q } = findUserByEmailOrNicknameDto;
     // 모든 필드를 가져오되, 역할에 따라 나중에 필드를 필터링
     const user = await this.usersRepository.findOne({
-      where: EmailOrNickname.includes('@')
-        ? { email: EmailOrNickname }
-        : { nickname: EmailOrNickname },
+      where: q.includes('@') ? { email: q } : { nickname: q },
       select: {
         id: true,
         email: true,
@@ -174,14 +176,14 @@ export class UsersService {
   }
 
   async update(
-    params: ParamInput,
+    params: ParamDto,
     jwtUser: JwtUser,
-    updateUserInput: UpdateUserInput & { deletePhoto?: string },
+    updateUserDto: UpdateUserDto,
     file: Express.Multer.File,
   ) {
     const { id } = params;
     const { id: userId, role: currentRole } = jwtUser;
-    const { password, role, deletePhoto, ...updataData } = updateUserInput;
+    const { password, role, deletePhoto, ...updataData } = updateUserDto;
 
     if (userId !== +id) {
       throw new ForbiddenException(
@@ -249,7 +251,7 @@ export class UsersService {
     };
   }
 
-  async delete(params: ParamInput, jwtUser: JwtUser) {
+  async delete(params: ParamDto, jwtUser: JwtUser) {
     const { id } = params;
     const { id: userId } = jwtUser;
 
@@ -317,10 +319,10 @@ export class UsersService {
   }
 
   async findPossiblePetsitters(
-    findPossiblePetsittersIput: FindPossiblePetsittersInput,
+    findPossiblePetsittersDto: FindPossiblePetsittersDto,
   ) {
     const { location, date, startTime, endTime, page, pageSize } =
-      findPossiblePetsittersIput;
+      findPossiblePetsittersDto;
 
     // 동적 조건
     const queryBuilder = this.usersRepository
@@ -468,12 +470,9 @@ export class UsersService {
     return me.favorites;
   }
 
-  async updateFavorite(
-    jwtUser: JwtUser,
-    updateFavoriteInput: UpdateFavoriteInput,
-  ) {
+  async updateFavorite(jwtUser: JwtUser, updateFavoriteDto: UpdateFavoriteDto) {
     const { id: userId } = jwtUser;
-    const { opponentId, action } = updateFavoriteInput;
+    const { opponentId, action } = updateFavoriteDto;
 
     // 현재 사용자 가져오기 (favorites)
     const me = await this.usersRepository.findOne({

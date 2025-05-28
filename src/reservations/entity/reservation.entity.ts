@@ -1,5 +1,3 @@
-import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsString } from 'class-validator';
 import { CoreEntity } from 'src/common/entity/core.entity';
 import { Journal } from 'src/journals/entity/journal.entity';
 import { Pet } from 'src/pets/entity/pet.entity';
@@ -16,45 +14,36 @@ import {
 } from 'typeorm';
 
 export enum ReservationStatus {
-  PENDING = 'Pending',
-  CANCELED = 'Canceled',
-  ACCEPTED = 'Accepted',
-  COMPLETED = 'Completed',
+  PENDING = 'pending',
+  CANCELED = 'canceled',
+  ACCEPTED = 'accepted',
+  COMPLETED = 'completed',
 }
 
 @Entity()
 export class Reservation extends CoreEntity {
   @Column({ type: 'date' })
-  @IsDate()
-  @Type(() => Date)
   date: Date;
 
   @Column({ type: 'time' })
-  @IsString()
   startTime: string;
 
   @Column({ type: 'time' })
-  @IsString()
   endTime: string;
 
   @Column({ nullable: true })
-  @IsString()
   zipcode: string;
 
   @Column()
-  @IsString()
   address: string;
 
   @Column()
-  @IsString()
   detailAddress: string;
 
   @Column({ type: 'enum', enum: ReservationStatus })
-  @IsEnum(ReservationStatus)
   status: ReservationStatus;
 
   @Column({ nullable: true })
-  @IsString()
   body: string;
 
   // 클라이언트 (예약을 생성한 사용자)

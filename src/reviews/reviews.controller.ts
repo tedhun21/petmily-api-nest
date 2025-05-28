@@ -1,4 +1,9 @@
-import { Controller, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common';
 
 import {
   Body,
@@ -13,9 +18,13 @@ import {
 import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { ReviewsService } from './reviews.service';
-import { ParamInput } from 'src/common/dto/param.dto';
-import { FindReviewsInput } from './dto/find.review.dto';
+import { ParamDto } from 'src/common/dto/param.dto';
+import { FindReviewsDto } from './dto/find.review.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import { CreateReviewDto } from './dto/create.review.dto';
+import { UpdateReviewDto } from './dto/update.review.dto';
 
 @Controller('reviews')
 export class ReviewsController {
@@ -23,46 +32,66 @@ export class ReviewsController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('files'))
   @Post()
-  create(
+  async create(
     @AuthUser() jwtUser: JwtUser,
-    @Body('data') createReviewInput: string,
+    @Body('data') createReviewDto: string,
     @UploadedFiles() files: Array<Express.Multer.File>,
   ) {
-    const parsedCreateReviewInput = JSON.parse(createReviewInput);
-    return this.reviewsService.create(jwtUser, parsedCreateReviewInput, files);
+    const dto = plainToInstance(CreateReviewDto, createReviewDto);
+    const errors = await validate(dto);
+
+    if (errors.length > 0) {
+      const formattedErrors = errors.map((err) => ({
+        property: err.property,
+        constraints: err.constraints,
+      }));
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: formattedErrors,
+      });
+    }
+    return this.reviewsService.create(jwtUser, dto, files);
   }
 
   @Get()
-  find(@Query() findReviewsInput: FindReviewsInput) {
-    return this.reviewsService.find(findReviewsInput);
+  find(@Query() findReviewsDto: FindReviewsDto) {
+    return this.reviewsService.find(findReviewsDto);
   }
 
   @Get(':id')
-  findOne(@Param() params: ParamInput) {
+  findOne(@Param() params: ParamDto) {
     return this.reviewsService.findOne(params);
   }
 
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('files'))
   @Put(':id')
-  update(
+  async update(
     @AuthUser() jwtUser: JwtUser,
-    @Param() params: ParamInput,
-    @Body('data') updateReviewInput: string,
+    @Param() params: ParamDto,
+    @Body('data') updateReviewDto: string,
     @UploadedFiles() files: Array<Express.Multer.File>,
   ) {
-    const parsedUpdateReviewInput = JSON.parse(updateReviewInput);
-    return this.reviewsService.update(
-      jwtUser,
-      params,
-      parsedUpdateReviewInput,
-      files,
-    );
+    const dto = plainToInstance(UpdateReviewDto, updateReviewDto);
+    const errors = await validate(dto);
+
+    if (errors.length > 0) {
+      const formattedErrors = errors.map((err) => ({
+        property: err.property,
+        constraints: err.constraints,
+      }));
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: formattedErrors,
+      });
+    }
+
+    return this.reviewsService.update(jwtUser, params, dto, files);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  delete(@AuthUser() jwtUser: JwtUser, @Param() params: ParamInput) {
+  delete(@AuthUser() jwtUser: JwtUser, @Param() params: ParamDto) {
     return this.reviewsService.delete(jwtUser, params);
   }
 

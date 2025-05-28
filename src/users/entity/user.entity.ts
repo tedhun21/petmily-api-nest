@@ -10,141 +10,96 @@ import {
   OneToMany,
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import {
-  IsArray,
-  IsBoolean,
-  IsEmail,
-  IsEnum,
-  IsNumber,
-  IsPhoneNumber,
-  IsString,
-  Length,
-  Max,
-  Min,
-} from 'class-validator';
-import { Pet, Species } from 'src/pets/entity/pet.entity';
+import { Pet, PetSpecies } from 'src/pets/entity/pet.entity';
 import { Reservation } from 'src/reservations/entity/reservation.entity';
 import { ChatMember } from 'src/chats/entity/chatMember.entity';
 import { Notification } from 'src/notifications/entity/notification.entity';
 import { NotificationRead } from 'src/notifications/entity/notification_read.entity';
 
 export enum UserRole {
-  USER = 'User',
-  CLIENT = 'Client',
-  PETSITTER = 'Petsitter',
+  USER = 'user',
+  CLIENT = 'client',
+  PETSITTER = 'petsitter',
 }
-
-export enum PetsitterApprovalStatus {
-  PENDING = 'Pending', // 승인 대기 중
-  APPROVED = 'Approved', // 승인 완료
-  REJECTED = 'Rejected', // 승인 거절
+export enum Provider {
+  LOCAL = 'local',
+  KAKAO = 'kakao',
+  GOOGLE = 'google',
+  NAVER = 'naver',
 }
-
 export enum DayOfWeek {
-  MON = 'Mon',
-  TUE = 'Tue',
-  WED = 'Wed',
-  THU = 'Thu',
-  FRI = 'Fri',
-  SAT = 'Sat',
-  SUN = 'Sun',
+  MON = 'mon',
+  TUE = 'tue',
+  WED = 'wed',
+  THU = 'thu',
+  FRI = 'fri',
+  SAT = 'sat',
+  SUN = 'sun',
 }
 
 @Entity()
 export class User extends CoreEntity {
   @Column()
-  @IsString()
-  @Length(2, 50)
   username: string;
 
   @Column({ nullable: true })
-  @IsString()
-  @Length(6, 30)
-  password?: string;
-
-  @Column({ nullable: true })
-  @IsString()
   nickname?: string;
 
   @Column()
-  @IsEmail()
   email: string;
 
-  @Column({ default: false })
-  @IsBoolean()
-  verified: boolean;
+  @Column({ nullable: true })
+  password?: string;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
-  @IsEnum(UserRole)
   role: UserRole;
 
+  @Column({ default: false })
+  verified: boolean;
+
   @Column({ nullable: true })
-  @IsString()
   zipcode: string;
 
   @Column({ nullable: true })
-  @IsString()
-  @Length(1, 30)
   address?: string;
 
   @Column({ nullable: true })
-  @IsString()
-  @Length(1, 30)
   detailAddress?: string;
 
   @Column({ nullable: true })
-  @IsPhoneNumber('KR')
   phone?: string;
 
   @Column({ nullable: true })
-  @IsString()
   photo?: string;
 
   @Column({ nullable: true })
-  @IsString()
   body?: string;
 
   @Column({ default: 0, nullable: true })
-  @IsNumber()
-  @Min(0)
-  @Max(5)
   star?: number;
 
   @Column({ default: 0, nullable: true })
-  @IsNumber()
-  @Min(0)
   reviewCount?: number;
 
   @Column({ default: 0, nullable: true })
-  @IsNumber()
-  @Min(0)
   completedReservationsCount?: number;
 
-  @Column({ default: 'local' })
-  @IsString()
-  provider?: string;
+  @Column({ type: 'enum', enum: Provider })
+  provider?: Provider;
 
-  @Column('enum', { array: true, enum: Species, nullable: true })
-  @IsArray()
-  @IsEnum(Species)
-  possiblePetSpecies: Species[];
+  @Column('enum', { array: true, enum: PetSpecies, nullable: true })
+  possiblePetSpecies?: PetSpecies[];
 
   @Column('enum', { array: true, enum: DayOfWeek, nullable: true })
-  @IsArray()
-  @IsEnum(DayOfWeek, { each: true })
   possibleDays: DayOfWeek[];
 
   @Column('text', { array: true, nullable: true })
-  @IsArray()
-  @IsString({ each: true })
   possibleLocations: string[];
 
   @Column({ type: 'time', nullable: true })
-  @IsString()
   possibleStartTime: string;
 
   @Column({ type: 'time', nullable: true })
-  @IsString()
   possibleEndTime: string;
 
   // 가지고 있는 펫 (for client)

@@ -7,7 +7,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // 전역 유효성 검사 파이프 설정
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true, // "1" -> 1 등 자동 타입 변환 // DTO의 타입에 맞게 쿼리/바디를 자동 변환해서 일일이 수동 파싱 안해도 된다
+    }),
+  );
 
   app.enableCors({
     origin: ['http://localhost:3000', 'https://petmily.vercel.app'], // 허용할 여러 도메인

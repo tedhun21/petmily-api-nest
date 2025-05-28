@@ -5,13 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
-import { CreatePetInput } from './dto/create.pet.dto';
+import { CreatePetDto } from './dto/create.pet.dto';
 import { Repository } from 'typeorm';
 import { Pet } from './entity/pet.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { UpdatePetInput } from './dto/update.pet.dto';
+
+import { ParamDto } from 'src/common/dto/param.dto';
+import { UpdatePetDto } from './dto/update.pet.dto';
 
 @Injectable()
 export class PetsService {
@@ -23,7 +25,7 @@ export class PetsService {
 
   async create(
     jwtUser: JwtUser,
-    createPetInput: CreatePetInput,
+    createPetDto: CreatePetDto,
     file: Express.Multer.File,
   ) {
     const { id: userId } = jwtUser;
@@ -32,14 +34,12 @@ export class PetsService {
     if (file) {
       photoUrl = await this.uploadsService.uploadFile(file);
     }
-
     // Pet 엔티티 생성
     const pet = this.petsRepository.create({
-      ...createPetInput,
+      ...createPetDto,
       owner: { id: userId },
       ...(photoUrl && { photo: photoUrl }),
     });
-
     try {
       const createdPet = await this.petsRepository.save(pet);
 
@@ -53,16 +53,13 @@ export class PetsService {
 
   async find(userId: number, paginationDto: PaginationDto) {
     const { page, pageSize } = paginationDto;
-
     try {
       const [pets, total] = await this.petsRepository.findAndCount({
         where: { owner: { id: userId } },
         take: +pageSize,
         skip: (+page - 1) * +pageSize,
       });
-
       const totalPages = Math.ceil(total / +pageSize);
-
       return {
         results: pets,
         pagination: {
@@ -77,8 +74,8 @@ export class PetsService {
     }
   }
 
-  async findOne(params: { id: string }) {
-    const { id } = params;
+  async findOne(paramDto: ParamDto) {
+    const { id } = paramDto;
 
     try {
       const pet = await this.petsRepository.findOne({ where: { id: +id } }); // await 추가
@@ -96,13 +93,13 @@ export class PetsService {
 
   async update(
     jwtUser: JwtUser,
-    params: { id: string },
-    updatePetInput: UpdatePetInput & { deletePhoto: string },
+    paramDto: ParamDto,
+    updatePetDto: UpdatePetDto,
     file: Express.Multer.File,
   ) {
     const { id: userId } = jwtUser;
-    const { id: petId } = params;
-    const { deletePhoto } = updatePetInput;
+    const { id: petId } = paramDto;
+    const { deletePhoto } = updatePetDto;
 
     const pet = await this.petsRepository.findOne({
       where: { id: +petId, owner: { id: userId } },
@@ -136,7 +133,7 @@ export class PetsService {
 
     const updateData = {
       ...pet,
-      ...updatePetInput,
+      ...updatePetDto,
       // photo가 undefined가 아닐 때만 필드에 포함
       ...(photo !== undefined && { photo }),
     };
@@ -150,9 +147,9 @@ export class PetsService {
     }
   }
 
-  async delete(jwtUser: JwtUser, params: { id: string }) {
+  async delete(jwtUser: JwtUser, paramDto: ParamDto) {
     const { id: userId } = jwtUser;
-    const { id: petId } = params;
+    const { id: petId } = paramDto;
 
     const pet = await this.petsRepository.findOne({
       where: { id: +petId, owner: { id: userId } },

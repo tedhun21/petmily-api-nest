@@ -8,7 +8,6 @@ import { ChatRoom } from './entity/chatRoom.entity';
 import { Message } from './entity/message.entity';
 import { ChatsService } from './chats.service';
 import { ChatsController } from './chats.controller';
-import { RedisModule } from 'src/redis/redis.module';
 import { ChatMember } from './entity/chatMember.entity';
 
 @Module({
@@ -23,7 +22,6 @@ import { ChatMember } from './entity/chatMember.entity';
       inject: [ConfigService],
     }),
     UsersModule,
-    RedisModule,
   ],
   providers: [ChatsGateWay, ChatsService],
   controllers: [ChatsController],

@@ -12,32 +12,44 @@ import {
 import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { ChatsService } from './chats.service';
-import { GetMessagesInput } from './dto/get-message.dto';
-import { GetChatRoomsInput } from './dto/get-chatRooms.dto';
+import { FindMessagesDto } from './dto/find.messages.dto';
+import { FindChatRoomsDto } from './dto/find.chatRooms.dto';
 import { UpdateUnreadCount } from './dto/update-unreadCount';
+import { FindChatRoomByUsersDto } from './dto/find.chatRoomByUsersDto';
+import { CreateChatRoomDto } from './dto/create.chatRoom.dto';
 
 @Controller('chats')
 export class ChatsController {
   constructor(private readonly chatsService: ChatsService) {}
 
   @UseGuards(JwtAuthGuard)
-  @Get()
-  getChatRooms(
+  @Post()
+  create(
     @AuthUser() jwtUser: JwtUser,
-    @Query() getChatRoomsInput: GetChatRoomsInput,
+    @Body() createChatRoomDto: CreateChatRoomDto,
   ) {
-    return this.chatsService.getChatRooms(jwtUser, getChatRoomsInput);
+    return this.chatsService.createChatRoom(jwtUser, createChatRoomDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  findChatRooms(
+    @AuthUser() jwtUser: JwtUser,
+    @Query() findChatRoomsDto: FindChatRoomsDto,
+  ) {
+    const { cursor } = findChatRoomsDto;
+    console.log(cursor);
+    console.log(typeof cursor);
+    return this.chatsService.findChatRooms(jwtUser, findChatRoomsDto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('by-users')
-  getChatRoomByUsers(
+  findChatRoomByUsers(
     @AuthUser() jwtUser: JwtUser,
-    @Query('opponentIds') opponentIds: string,
+    @Query() query: FindChatRoomByUsersDto,
   ) {
-    const arrayIds = opponentIds.split(',').map((id) => Number(id));
-
-    return this.chatsService.getChatRoomByUsers(jwtUser, arrayIds);
+    return this.chatsService.findChatRoomByUsers(jwtUser, query);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -55,34 +67,22 @@ export class ChatsController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post()
-  findO(
-    @AuthUser() jwtUser: JwtUser,
-    @Body() createChatRoomInput: { opponentIds: number[] },
-  ) {
-    const { opponentIds } = createChatRoomInput;
-    const arrayIds = opponentIds.map((id) => Number(id));
-
-    return this.chatsService.createChatRoom(jwtUser, arrayIds);
-  }
-
-  @UseGuards(JwtAuthGuard)
   @Get(':chatRoomId')
-  getChatRoom(
+  findChatRoom(
     @AuthUser() jwtUser: JwtUser,
     @Param('chatRoomId', ParseIntPipe) chatRoomId: number,
   ) {
-    return this.chatsService.getChatRoom(jwtUser, chatRoomId);
+    return this.chatsService.findChatRoom(jwtUser, chatRoomId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':chatRoomId/messages')
-  getMessages(
+  findMessages(
     @AuthUser() jwtUser: JwtUser,
     @Param() params: { chatRoomId: string },
-    @Query() getMessagesInput: GetMessagesInput,
+    @Query() findMessagesDto: FindMessagesDto,
   ) {
-    return this.chatsService.getMessages(jwtUser, params, getMessagesInput);
+    return this.chatsService.findMessages(jwtUser, params, findMessagesDto);
   }
 
   @UseGuards(JwtAuthGuard)

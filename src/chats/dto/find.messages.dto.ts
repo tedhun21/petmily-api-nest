@@ -1,10 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsNumber } from 'class-validator';
+import { IsNumber, IsOptional } from 'class-validator';
 
-export class PaginationDto {
+export class FindMessagesDto {
   @Type(() => Number)
+  @IsOptional()
   @IsNumber()
-  page: number;
+  cursor?: number;
 
   @Type(() => Number)
   @IsNumber()

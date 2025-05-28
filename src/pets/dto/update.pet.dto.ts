@@ -1,6 +1,9 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { CreatePetInput } from './create.pet.dto';
+import { CreatePetDto } from './create.pet.dto';
+import { IsOptional, IsString } from 'class-validator';
 
-export class UpdatePetInput extends PartialType(CreatePetInput) {}
-
-export class UpdatePetOutput {}
+export class UpdatePetDto extends PartialType(CreatePetDto) {
+  @IsOptional()
+  @IsString()
+  deletePhoto?: string;
+}

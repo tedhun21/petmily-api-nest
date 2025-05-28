@@ -1,6 +1,10 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { Journal } from '../entity/journal.entity';
+import { CreateJournalDto } from './create.journal.dto';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
-export class UpdateJournalInput extends PartialType(Journal) {
-  deleteFiles: string[];
+export class UpdateJournalDto extends PartialType(CreateJournalDto) {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  deletePhotos?: string[];
 }

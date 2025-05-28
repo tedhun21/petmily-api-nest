@@ -7,13 +7,15 @@ import {
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { Journal } from './entity/journal.entity';
-import { CreateJournalInput } from './dto/create.journal.dto';
+import { CreateJournalDto } from './dto/create.journal.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { UploadsService } from 'src/uploads/uploads.service';
-import { UpdateJournalInput } from './dto/update.journal.dto';
+import { UpdateJournalDto } from './dto/update.journal.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { UserRole } from 'src/users/entity/user.entity';
+import { ParamDto } from 'src/common/dto/param.dto';
 
 @Injectable()
 export class JournalsService {
@@ -26,18 +28,18 @@ export class JournalsService {
 
   async create(
     jwtUser: JwtUser,
-    createJournalInput: CreateJournalInput,
+    createJournalDto: CreateJournalDto,
     files: Array<Express.Multer.File>,
   ) {
     const { id: userId, role } = jwtUser;
 
-    const { reservationId } = createJournalInput;
+    const { reservationId } = createJournalDto;
 
     const reservation = await this.reservationsService.findOne(jwtUser, {
       id: reservationId,
     });
 
-    if (role !== 'Petsitter' || reservation.petsitter.id !== userId) {
+    if (role !== UserRole.PETSITTER || reservation.petsitter.id !== userId) {
       throw new ForbiddenException(
         "You don't have permission to create a journal.",
       );
@@ -54,7 +56,7 @@ export class JournalsService {
       );
     }
     const journal = this.journalsRepository.create({
-      ...createJournalInput,
+      ...createJournalDto,
       ...(photoUrls.length > 0 && { photos: photoUrls }),
       reservation: { id: reservationId },
     });
@@ -73,9 +75,9 @@ export class JournalsService {
     const { page, pageSize } = paginationDto;
 
     const whereCondition =
-      role === 'Client'
+      role === UserRole.CLIENT
         ? { reservation: { client: { id: userId } } }
-        : role === 'Petsitter' && {
+        : role === UserRole.PETSITTER && {
             reservation: { petsitter: { id: userId } },
           };
 
@@ -97,9 +99,9 @@ export class JournalsService {
     }
   }
 
-  async findOne(jwtUser: JwtUser, params: { id: string | number }) {
+  async findOne(jwtUser: JwtUser, paramDto: ParamDto) {
     const { id: userId } = jwtUser;
-    const { id: journalId } = params;
+    const { id: journalId } = paramDto;
 
     try {
       const journal = await this.journalsRepository.findOne({
@@ -127,12 +129,12 @@ export class JournalsService {
   async update(
     jwtUser: JwtUser,
     params: { id: string | number },
-    updateJournalInput: UpdateJournalInput,
+    updateJournalDto: UpdateJournalDto,
     files: Array<Express.Multer.File>,
   ) {
     const { id: userId } = jwtUser;
     const { id: journalId } = params;
-    const { deleteFiles, body } = updateJournalInput;
+    const { deletePhotos, body } = updateJournalDto;
 
     const journal = await this.journalsRepository.findOne({
       where: { id: +journalId },
@@ -152,14 +154,14 @@ export class JournalsService {
     // journal.photos가 배열이 아니면 빈 배열로 초기화
     journal.photos = journal.photos || [];
 
-    if (deleteFiles && deleteFiles.length > 0) {
+    if (deletePhotos && deletePhotos.length > 0) {
       await Promise.all(
-        deleteFiles.map(
+        deletePhotos.map(
           async (file) => await this.uploadsService.deleteFile({ url: file }),
         ),
       );
       journal.photos = journal.photos.filter(
-        (url: string) => !deleteFiles.includes(url),
+        (url: string) => !deletePhotos.includes(url),
       );
     }
 
@@ -191,9 +193,9 @@ export class JournalsService {
     }
   }
 
-  async delete(jwtUser: JwtUser, params: { id: string | number }) {
+  async delete(jwtUser: JwtUser, paramDto: ParamDto) {
     const { id: userId } = jwtUser;
-    const { id: journalId } = params;
+    const { id: journalId } = paramDto;
 
     const journal = await this.journalsRepository.findOne({
       where: { id: +journalId },

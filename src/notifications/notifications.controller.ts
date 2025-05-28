@@ -1,32 +1,40 @@
-import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { NotificationsGateway } from './notifications.gateway';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from 'src/auth/auth.jwt-guard';
 import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
-
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { KafkaService } from 'src/kafka/kafka.service';
+import { CreateNotificationDto } from './dto/create.notification.dto';
 
 @Controller('notifications')
 export class NotificationsController {
   constructor(
     private readonly notificationsGateway: NotificationsGateway,
     private readonly notificationsService: NotificationsService,
-    private readonly kafkaService: KafkaService,
   ) {}
 
   // 카프카 예약 업데이트
   @EventPattern('reservation-update')
-  async handleReservationUpdate(@Payload() payload: any) {
+  async handleReservationUpdate(@Payload() payload: CreateNotificationDto) {
     try {
       // 알림 생성
       const newNotification = await this.notificationsService.create(payload);
 
-      const { receivers, ...notificationWithoutReceivers } = newNotification;
+      const { receivers, metadata, ...notificationWithoutReceivers } =
+        newNotification;
 
       const socketPayload = {
         ...notificationWithoutReceivers,
+        metadata,
         readStatus: receivers.map((receiver) => ({
           id: receiver.id,
           isRead: false,
@@ -34,7 +42,7 @@ export class NotificationsController {
         })),
       };
 
-      // 웹소켓 유저한테 알림 보내기
+      // 웹소켓 유저한테 알림 보내기 (to 프론트)
       this.notificationsGateway.sendNotificationsToUsers(
         payload.receiverIds,
         socketPayload,
@@ -43,6 +51,12 @@ export class NotificationsController {
       // 실패한 메시지를 재처리하기 위해 DLQ(Dead Letter Queue)로 보내기
       // await this.kafkaService.produce('notification-dlq', payload);
     }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  create(@Body() createNotificationDto: CreateNotificationDto) {
+    return this.notificationsService.create(createNotificationDto);
   }
 
   @UseGuards(JwtAuthGuard)
