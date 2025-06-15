@@ -1,3 +1,4 @@
 {
-  "docker.dockerPath": "/usr/local/bin/docker"
+  "docker.dockerPath": "/usr/local/bin/docker",
+  "containers.containerCommand": "/usr/local/bin/docker"
 }

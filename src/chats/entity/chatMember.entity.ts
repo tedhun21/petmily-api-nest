@@ -14,6 +14,9 @@ export class ChatMember extends CoreEntity {
   })
   chatRoom: ChatRoom;
 
-  @Column({ default: 0 })
-  unreadCount: number;
+  @Column({ nullable: true })
+  lastSeenMessageId: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lastSeenMessageCreatedAt: Date;
 }

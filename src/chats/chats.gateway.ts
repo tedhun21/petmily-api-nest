@@ -8,6 +8,8 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { ChatsService } from './chats.service';
+import { SendMessageDto } from './dto/send.message.dto';
+import { ReadMessageDto } from './dto/read.message.dto';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class ChatsGateWay {
@@ -19,7 +21,7 @@ export class ChatsGateWay {
   server: Server;
 
   // 유저가 채팅방에 조인
-  @SubscribeMessage('joinChatRoom')
+  @SubscribeMessage('chat:room:join')
   handleJoinChatRoom(
     @MessageBody() chatRoomId: string,
     @ConnectedSocket() client: Socket,
@@ -28,7 +30,7 @@ export class ChatsGateWay {
     console.log(`Client joined room: ${chatRoomId}`);
   }
 
-  @SubscribeMessage('joinChatUser')
+  @SubscribeMessage('chat:user:join')
   async handleJoinChatUser(@ConnectedSocket() client: Socket) {
     const token = client.handshake.auth.token;
 
@@ -42,26 +44,22 @@ export class ChatsGateWay {
     }
   }
 
-  @SubscribeMessage('sendMessage')
+  @SubscribeMessage('chat:message:new')
   async handleSendMessage(
     @MessageBody()
-    data: {
-      chatRoomId: number;
-      message: string;
-      opponentIds: number[];
-    },
+    data: SendMessageDto,
     @ConnectedSocket() client: Socket,
   ) {
     const token = client.handshake.auth.token; // Socket.IO 미들웨어로 token 잡기
-    const { chatRoomId, message, opponentIds } = data;
+    const { chatRoomId, opponentIds, message } = data;
 
     try {
       // token decode
       const decoded = await this.jwtService.verify(token);
 
       const newMessage = await this.chatsService.createMessage(
-        chatRoomId,
         decoded,
+        chatRoomId,
         message,
       );
 
@@ -69,14 +67,14 @@ export class ChatsGateWay {
         // 채팅방에 메세지 전송
         this.server
           .to(`chatRoom_${chatRoomId.toString()}`)
-          .emit('chatRoomMessage', newMessage);
+          .emit('chat:room:message:new', newMessage);
 
-        // 개별 유저에게 전송
+        // 상대방 유저에게 전송
         for (const memberId of opponentIds) {
           if (memberId !== decoded.id) {
             this.server
               .to(`chatUser_${memberId.toString()}`)
-              .emit('directMessage', newMessage);
+              .emit('chat:user:message:new', newMessage);
           }
         }
       }
@@ -85,28 +83,47 @@ export class ChatsGateWay {
     }
   }
 
-  @SubscribeMessage('readMessage')
+  @SubscribeMessage('chat:read:mark')
   async markReadMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data,
+    @MessageBody() data: ReadMessageDto,
   ) {
-    const token = client.handshake.auth.token; // Socket.IO 미들웨어로 token 잡기
-    const { chatRoomId, messageId } = data;
+    const token = client.handshake.auth.token;
+    console.log('---------------------------data', data);
+    const { chatRoomId, lastSeenMessage } = data;
 
     try {
       const decoded = await this.jwtService.verify(token);
 
-      await this.chatsService.updateReadMessages(
+      // 1. 각 메시지의 readBy 업데이트
+      await this.chatsService.updateReadByMessages(
         decoded,
         chatRoomId,
-        messageId,
+        lastSeenMessage,
       );
 
-      // 채팅방에 읽음표시
-      this.server.to(`chatRoom_${chatRoomId.toString()}`).emit('readMessage', {
-        messageId,
-        userId: decoded.id,
-      });
+      // 2. chatMember의 lastSeenMessageCreatedAt 업데이트
+      await this.chatsService.updateLastMessageChatMember(
+        decoded,
+        chatRoomId,
+        lastSeenMessage,
+      );
+
+      // 채팅방에 있는 모든 참여자에게 (채팅방 내부) 읽음 표시 broadcast
+      this.server
+        .to(`chatRoom_${chatRoomId.toString()}`)
+        .emit('chat:room:read:update', {
+          lastSeenMessage,
+          userId: decoded.id,
+        });
+
+      // 해당 유저에세 개인적 (채팅방 외부)
+      this.server
+        .to(`chatUser_${decoded.id}`)
+        .emit('chat:user:newMessage:clear', {
+          lastSeenMessage,
+          userId: decoded.id,
+        });
     } catch (e) {}
   }
 }

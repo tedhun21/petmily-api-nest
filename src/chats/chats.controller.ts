@@ -5,7 +5,6 @@ import {
   Param,
   ParseIntPipe,
   Post,
-  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -14,7 +13,6 @@ import { AuthUser, JwtUser } from 'src/auth/decorater/auth.decorator';
 import { ChatsService } from './chats.service';
 import { FindMessagesDto } from './dto/find.messages.dto';
 import { FindChatRoomsDto } from './dto/find.chatRooms.dto';
-import { UpdateUnreadCount } from './dto/update-unreadCount';
 import { FindChatRoomByUsersDto } from './dto/find.chatRoomByUsersDto';
 import { CreateChatRoomDto } from './dto/create.chatRoom.dto';
 
@@ -24,7 +22,7 @@ export class ChatsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(
+  createChatRoom(
     @AuthUser() jwtUser: JwtUser,
     @Body() createChatRoomDto: CreateChatRoomDto,
   ) {
@@ -37,9 +35,6 @@ export class ChatsController {
     @AuthUser() jwtUser: JwtUser,
     @Query() findChatRoomsDto: FindChatRoomsDto,
   ) {
-    const { cursor } = findChatRoomsDto;
-    console.log(cursor);
-    console.log(typeof cursor);
     return this.chatsService.findChatRooms(jwtUser, findChatRoomsDto);
   }
 
@@ -50,20 +45,6 @@ export class ChatsController {
     @Query() query: FindChatRoomByUsersDto,
   ) {
     return this.chatsService.findChatRoomByUsers(jwtUser, query);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Put('unread-counts')
-  updateUnreadCount(
-    @AuthUser() jwtUser: JwtUser,
-    @Query() updateUnreadCountQuery,
-    @Body() updateUnreadCount: UpdateUnreadCount,
-  ) {
-    return this.chatsService.updateUnreadCount(
-      jwtUser,
-      updateUnreadCountQuery,
-      updateUnreadCount,
-    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -79,23 +60,19 @@ export class ChatsController {
   @Get(':chatRoomId/messages')
   findMessages(
     @AuthUser() jwtUser: JwtUser,
-    @Param() params: { chatRoomId: string },
+    @Param('chatRoomId', ParseIntPipe) chatRoomId: number,
     @Query() findMessagesDto: FindMessagesDto,
   ) {
-    return this.chatsService.findMessages(jwtUser, params, findMessagesDto);
+    return this.chatsService.findMessages(jwtUser, chatRoomId, findMessagesDto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':chatRoomId/messages')
   createMessage(
     @AuthUser() jwtUser: JwtUser,
-    @Param() params: { chatRoomId: string },
-    @Body() message,
+    @Param('chatRoomId', ParseIntPipe) chatRoomId: number,
+    @Body() message: string,
   ) {
-    return this.chatsService.createMessage(
-      +params.chatRoomId,
-      jwtUser,
-      message,
-    );
+    return this.chatsService.createMessage(jwtUser, chatRoomId, message);
   }
 }

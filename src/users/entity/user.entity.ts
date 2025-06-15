@@ -11,7 +11,6 @@ import {
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Pet, PetSpecies } from 'src/pets/entity/pet.entity';
-import { Reservation } from 'src/reservations/entity/reservation.entity';
 import { ChatMember } from 'src/chats/entity/chatMember.entity';
 import { Notification } from 'src/notifications/entity/notification.entity';
 import { NotificationRead } from 'src/notifications/entity/notification_read.entity';
@@ -105,14 +104,6 @@ export class User extends CoreEntity {
   // 가지고 있는 펫 (for client)
   @OneToMany(() => Pet, (pet) => pet.owner)
   pets: Pet[];
-
-  // 클라이언트로서 예약한 경우 (for client)
-  @OneToMany(() => Reservation, (reservation) => reservation.client)
-  clientReservations: Reservation[];
-
-  // 펫시터로서 예약받은 경우 (for petsitter)
-  @OneToMany(() => Reservation, (reservation) => reservation.petsitter)
-  petsitterReservations: Reservation[];
 
   @ManyToMany(() => User)
   @JoinTable({

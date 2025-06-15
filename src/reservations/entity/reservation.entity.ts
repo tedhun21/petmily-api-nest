@@ -46,12 +46,10 @@ export class Reservation extends CoreEntity {
   @Column({ nullable: true })
   body: string;
 
-  // 클라이언트 (예약을 생성한 사용자)
-  @ManyToOne(() => User, (user) => user.clientReservations)
+  @ManyToOne(() => User)
   client: User;
 
-  // 펫시터 (예약을 수락하는 사용자)
-  @ManyToOne(() => User, (user) => user.petsitterReservations)
+  @ManyToOne(() => User)
   petsitter: User;
 
   @ManyToMany(() => Pet, (pet) => pet.reservations)
