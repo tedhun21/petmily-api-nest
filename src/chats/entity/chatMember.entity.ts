@@ -1,7 +1,8 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { CoreEntity } from 'src/common/entity/core.entity';
 import { User } from 'src/users/entity/user.entity';
 import { ChatRoom } from './chatRoom.entity';
+import { Message } from './message.entity';
 
 @Entity()
 export class ChatMember extends CoreEntity {
@@ -14,9 +15,7 @@ export class ChatMember extends CoreEntity {
   })
   chatRoom: ChatRoom;
 
-  @Column({ nullable: true })
-  lastSeenMessageId: number;
-
-  @Column({ type: 'timestamp', nullable: true })
-  lastSeenMessageCreatedAt: Date;
+  @ManyToOne(() => Message, { nullable: true })
+  @JoinColumn({ name: 'lastReadMessageId' })
+  lastReadMessage: Message;
 }

@@ -1,9 +1,12 @@
-import { IsNumber } from 'class-validator';
-import { Message } from '../entity/message.entity';
+import { IsDateString, IsNumber } from 'class-validator';
 
 export class ReadMessageDto {
   @IsNumber()
   chatRoomId: number;
 
-  lastSeenMessage: Message;
+  @IsNumber()
+  lastReadMessageId: number;
+
+  @IsDateString()
+  lastReadMessageCreatedAt: string;
 }

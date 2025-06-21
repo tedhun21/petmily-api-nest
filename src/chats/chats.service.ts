@@ -9,13 +9,14 @@ import { UserRole } from 'src/users/entity/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, LessThan, Repository } from 'typeorm';
 import { Message } from './entity/message.entity';
-import { ChatRoom, ILastMessageInfo } from './entity/chatRoom.entity';
+import { ChatRoom } from './entity/chatRoom.entity';
 import { FindMessagesDto } from './dto/find.messages.dto';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { FindChatRoomsDto } from './dto/find.chatRooms.dto';
 import { ChatMember } from './entity/chatMember.entity';
 import { FindChatRoomByUsersDto } from './dto/find.chatRoomByUsersDto';
 import { CreateChatRoomDto } from './dto/create.chatRoom.dto';
+import { RedisChatService } from 'src/redis/chat/redis-chat.service';
 
 @Injectable()
 export class ChatsService {
@@ -27,6 +28,7 @@ export class ChatsService {
     @InjectRepository(ChatMember)
     private readonly chatMembersRepository: Repository<ChatMember>,
     private readonly dataSource: DataSource,
+    private readonly redisChatService: RedisChatService,
   ) {}
 
   async createChatRoom(
@@ -111,46 +113,49 @@ export class ChatsService {
     });
   }
 
+  // redis에 unreadCount가 없으면 -> 계산해서 redis에 넣고 반환
   async findChatRooms(jwtUser: JwtUser, findChatRoomsDto: FindChatRoomsDto) {
     const { id: userId } = jwtUser;
-    const { pageSize, cursorId, cursorCreatedAt } = findChatRoomsDto;
+    const { pageSize, cursorId, cursorDate } = findChatRoomsDto;
 
     // 1. 채팅방 목록 불러오기 (paging + 정렬)
     const qb = this.chatRoomsRepository
-      .createQueryBuilder('chatroom')
-      .leftJoinAndSelect('chatroom.chatMembers', 'chatmember')
-      .leftJoin('chatmember.user', 'user')
-      .addSelect(['user.id', 'user.nickname', 'user.photo', 'user.role']);
+      .createQueryBuilder('chatRoom')
+      .leftJoinAndSelect('chatRoom.chatMembers', 'chatMember')
+      .leftJoin('chatMember.user', 'user')
+      .addSelect(['user.id', 'user.nickname', 'user.photo', 'user.role'])
+      .leftJoin('chatRoom.lastMessage', 'lastMessage')
+      .addSelect([
+        'lastMessage.id',
+        'lastMessage.content',
+        'lastMessage.createdAt',
+      ]);
 
-    if (cursorCreatedAt && cursorId) {
-      // 만약 cursorCreatedAt이 lastMessage.createdAt과 같다면, lastMessage.id가 cursorId보다 더 작은 경우만 이전 데이터로 간주
+    if (cursorDate && cursorId) {
       qb.andWhere(
         new Brackets((qb1) => {
           qb1
             .where(
-              `("chatroom"."lastMessage"->>'createdAt')::timestamp < :cursorCreatedAt`,
-              { cursorCreatedAt },
+              `DATE_TRUNC('milliseconds', lastMessage.createdAT) < :cursorDate`,
+              { cursorDate },
             )
             .orWhere(
-              `(("chatroom"."lastMessage"->>'createdAt')::timestamp = :cursorCreatedAt AND ("chatroom"."lastMessage"->>'id')::int < :cursorId)`,
-              {
-                cursorCreatedAt,
-                cursorId,
-              },
+              new Brackets((qb2) => {
+                qb2
+                  .where(
+                    `DATE_TRUNC('milliseconds', lastMessage.createdAt) = :cursorDate`,
+                    { cursorDate },
+                  )
+                  .andWhere(`lastMessage.id < :cursorId`, { cursorId });
+              }),
             );
         }),
       );
     }
 
-    qb.addSelect(
-      `("chatroom"."lastMessage"->>'createdAt')::timestamp`,
-      'lastSentAt',
-    );
-
-    qb.orderBy(
-      `("chatroom"."lastMessage"->>'createdAt')::timestamp`,
-      'DESC',
-    ).addOrderBy(`("chatroom"."lastMessage"->>'id')::int`, 'DESC');
+    qb.orderBy('lastMessage.createdAt', 'DESC')
+      .addOrderBy('lastMessage.id', 'DESC')
+      .limit(pageSize);
 
     const chatRooms = await qb.getMany();
 
@@ -158,42 +163,35 @@ export class ChatsService {
 
     const processed = await Promise.all(
       chatRooms.map(async (room) => {
-        const me = room.chatMembers.find((m) => m.user.id === userId);
-        const others = room.chatMembers.filter((m) => m.user.id !== userId);
+        const me = room.chatMembers.find((member) => member.user.id === userId);
+        const others = room.chatMembers.filter(
+          (member) => member.user.id !== userId,
+        );
 
-        let unreadCount = 0;
-        if (
-          room.lastMessage?.createdAt &&
-          me?.lastSeenMessageCreatedAt &&
-          me?.lastSeenMessageId !== undefined
-        ) {
-          unreadCount = await this.messagesRepository
-            .createQueryBuilder('message')
-            .where('message.chatRoomId = :roomId', { roomId: room.id })
-            .andWhere(
-              new Brackets((qb) => {
-                qb.where(
-                  // Date(microseconds)랑 JS객체(milliseconds) 비교시 일치 x
-                  // 비교 정밀도 일치
-                  `DATE_TRUNC('milliseconds', message.createdAt) > :lastSeenDate`,
-                  {
-                    lastSeenDate: me.lastSeenMessageCreatedAt,
-                  },
-                ).orWhere(
-                  new Brackets((qb2) => {
-                    qb2
-                      .where(
-                        `DATE_TRUNC('milliseconds', message.createdAt) = :lastSeenDate`,
-                        { lastSeenDate: me.lastSeenMessageCreatedAt },
-                      )
-                      .andWhere('message.id > :lastSeenId', {
-                        lastSeenId: me.lastSeenMessageId,
-                      });
-                  }),
-                );
-              }),
-            )
-            .getCount();
+        let unreadCount: number;
+
+        const exists = await this.redisChatService.hasUnreadCount(
+          userId,
+          room.id,
+        );
+
+        if (exists) {
+          // ✅ 이미 Redis에 있다면 캐싱된 값
+          unreadCount = await this.redisChatService.getUnreadCount(
+            userId,
+            room.id,
+          );
+        } else {
+          // ❗ 없을 때만 DB 연산 + 캐싱
+          unreadCount = await this.getUnreadMessageCountByChatRoom(
+            room.id,
+            userId,
+          );
+          await this.redisChatService.setUnreadCount(
+            userId,
+            room.id,
+            unreadCount,
+          );
         }
 
         return {
@@ -221,17 +219,12 @@ export class ChatsService {
       const chatRoom = await this.chatRoomsRepository
         .createQueryBuilder('chatRoom')
         .leftJoinAndSelect('chatRoom.chatMembers', 'chatMember')
-        .leftJoinAndSelect('chatMember.user', 'user')
+        .leftJoin('chatMember.user', 'user')
+        .addSelect(['user.id', 'user.nickname', 'user.photo', 'user.role'])
+        .leftJoin('chatMember.lastReadMessage', 'lastReadMessage')
+        .addSelect(['lastReadMessage.id', 'lastReadMessage.createdAt'])
+        .leftJoinAndSelect('chatRoom.lastMessage', 'lastMessage')
         .where('chatRoom.id = :chatRoomId', { chatRoomId })
-        .select([
-          'chatRoom.id',
-          'chatRoom.lastMessage', // JSONB 컬럼도 선택 가능
-          'chatMember.id',
-          'user.id',
-          'user.nickname',
-          'user.photo',
-          'user.role',
-        ])
         .getOne();
 
       // 현재 사용자 정보 찾기
@@ -331,7 +324,6 @@ export class ChatsService {
         content: true,
         createdAt: true,
         sender: { id: true, nickname: true, photo: true, role: true },
-        readBy: true,
       },
       take: pageSize,
     };
@@ -367,7 +359,11 @@ export class ChatsService {
     };
   }
 
-  // 트랜잭션 // 메세지 저장 & chatMember unreadCount & 유저 unread count 증가
+  // 트랜잭션
+  // 1. 메세지 저장
+  // 2. 채팅방의 `lastMessage` 업데이트
+  // 3. sender의 읽음 메시지 업데이트
+  // 4. 모든 chatMember 중, 보낸 사람 (sender)을 죄외한 사람들의 redis 캐시 unreadCount +=1
   async createMessage(jwtUser: JwtUser, chatRoomId: number, message: string) {
     const { id: senderId } = jwtUser;
 
@@ -387,87 +383,178 @@ export class ChatsService {
         chatRoom: { id: chatRoom.id },
         sender: { id: senderId },
         content: message,
-        readBy: [senderId],
       });
       const savedMessage = await manager.save(Message, newMessage);
 
-      // 3. ChatRoom의 `lastMessage` 업데이트
-      const lastMessageInfo: ILastMessageInfo = {
-        id: savedMessage.id,
-        content: savedMessage.content,
-        createdAt: savedMessage.createdAt,
-        senderId: savedMessage.sender.id,
-      };
-
-      chatRoom.lastMessage = lastMessageInfo; //
+      // 2. chatRoom의 `lastMessage` 업데이트
+      chatRoom.lastMessage = savedMessage; //
       await manager.save(chatRoom);
+
+      // 3. chatRoom에 해당하는 chatMember 뷸러오기
+      const chatMembers = await manager.find(ChatMember, {
+        where: { chatRoom: { id: chatRoom.id } },
+        relations: ['user'],
+        select: { user: { id: true } },
+      });
+
+      // 4. sender lastReadMessage 업데이트 + 나머지 멤버는 Redis 카운트 증가
+      await Promise.all(
+        chatMembers.map(async (member) => {
+          if (member.user.id === senderId) {
+            member.lastReadMessage = savedMessage;
+            await manager.save(ChatMember, member);
+          } else {
+            await this.redisChatService.incremetOrInitUnreadCount(
+              member.user.id,
+              chatRoomId,
+              1,
+            );
+          }
+        }),
+      );
 
       return savedMessage;
     });
   }
 
-  async updateReadByMessages(
-    jwtUser: JwtUser,
-    chatRoomId: number,
-    lastSeenMessage: Message,
-  ) {
-    // 1. 특정 채팅방에 속한 메시지들만
-    // 2. 메시지의 createdAt이 lastSeenMessageCreatedAt보다 이전
-    // 3. readBy 배열에 해당 유저 ID가 포함되지 않은 메시지들만
-    // 4. -> 위 조건을 만족하는 메시디르의 readBy 필드에 userId 추가
+  // 유저의 안 읽은 메시지 카운트 조회
+  async getUnreadMessageCountByUser(jwtUser: JwtUser) {
     const { id: userId } = jwtUser;
 
-    // 1. 채팅방 조회 및 유저가 멤버인지 확인
-    const chatRoom = await this.chatRoomsRepository.findOne({
-      where: { id: chatRoomId },
-      relations: ['chatMembers', 'chatMembers.user'],
-    });
+    // 1. 사용자가 속한 모든 채팅방 ID 조회
+    const chatRoomIds = await this.chatMembersRepository
+      .createQueryBuilder('chatMember')
+      .select('chatMember.chatRoom.id', 'chatRoomId')
+      .where('chatMember.user.id = :userId', { userId })
+      .getRawMany(); // 결과: [{ chatRoomId: 1 }, { chatRoomId: 2 }, ...]
 
-    const isMember = chatRoom?.chatMembers.some(
-      (member) => member.user.id === userId,
-    );
+    // 2. Redis에서 모든 캐시된 count 가져오기
+    const cachedCounts = await this.redisChatService.getAllUnreadCounts(userId); // hgetall
 
-    if (!chatRoom || !isMember) {
-      throw new NotFoundException('No chat room found');
+    let total = 0;
+
+    for (const { chatRoomId } of chatRoomIds) {
+      const cached = cachedCounts[chatRoomId];
+      if (cached !== undefined) {
+        total += Number(cached); // Redis에서 꺼낸 값은 문자열일 수 있음
+      } else {
+        const count = await this.getUnreadMessageCountByChatRoom(
+          chatRoomId,
+          userId,
+        );
+        await this.redisChatService.setUnreadCount(userId, chatRoomId, count);
+        total += count;
+      }
     }
 
-    // 서버에서 1ms 보정
-    const correctedTime = new Date(
-      new Date(lastSeenMessage.createdAt).getTime() + 1,
-    );
-
-    // 2. 메시지 업데이트: 조건 만족 시 readBy에 userId 추가
-    await this.messagesRepository
-      .createQueryBuilder('message')
-      .update()
-      .set({
-        readBy: () => `array_append(COALESCE("readBy", '{}'), :userId)`,
-      })
-      .where('"message"."chatRoomId" = :chatRoomId', { chatRoomId })
-      .andWhere('"message"."createdAt" <= :lastSeenMessageCreatedAt', {
-        lastSeenMessageCreatedAt: correctedTime,
-      })
-      .andWhere(`NOT (:userId = ANY("message"."readBy"))`, { userId })
-      .execute();
+    return total;
   }
 
-  async updateLastMessageChatMember(
+  // 트랜잭션
+  // 1. ChatMember(me) `lastMessage` 업데이트
+  // 2. redis 캐시 업데이트 ()
+  // 외부작업(redis 때문에 queryRunner 사용 - DB 커밋이 확실히 된 후에 작업을 수항해기 때문에 일관성 good)
+  async markMessagesAsRead(
     jwtUser: JwtUser,
     chatRoomId: number,
-    lastSeenMessage: Message,
+    lastReadMessage: {
+      lastReadMessageId: number;
+      lastReadMessageCreatedAt: string;
+    },
   ) {
     const { id: userId } = jwtUser;
+    const { lastReadMessageId, lastReadMessageCreatedAt } = lastReadMessage;
 
-    const chatMember = await this.chatMembersRepository.findOne({
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. ChatMember의 lastMessage 업데이트
+      const meMember = await queryRunner.manager.findOne(ChatMember, {
+        where: { chatRoom: { id: chatRoomId }, user: { id: userId } },
+        relations: ['chatRoom', 'user'],
+      });
+
+      if (!meMember) throw new NotFoundException('ChatMember not found');
+
+      const message = await queryRunner.manager
+        .createQueryBuilder(Message, 'message')
+        .where('message.id = :id', { id: lastReadMessageId })
+        .andWhere(
+          `DATE_TRUNC('milliseconds', message.createdAt) = :lastReadMessageCreatedAt`,
+          { lastReadMessageCreatedAt },
+        )
+        .getOne();
+
+      // 2. 읽음 정보 업데이트
+      meMember.lastReadMessage = message;
+      await queryRunner.manager.save(meMember);
+
+      // DB 커밋 끝
+      await queryRunner.commitTransaction();
+
+      // 3. 안 읽은 메시지 카운트 다시 계산 후, redis 캐시 업데이트
+      const unreadCount = await this.getUnreadMessageCountByChatRoom(
+        chatRoomId,
+        userId,
+      );
+
+      await this.redisChatService.setUnreadCount(
+        userId,
+        chatRoomId,
+        unreadCount,
+      );
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  // 채팅방의 안 읽은 메시지 카운트
+  async getUnreadMessageCountByChatRoom(
+    chatRoomId: number,
+    userId: number,
+  ): Promise<number> {
+    // 1. ChatMember 조회 (lastMessage 가져오기)
+    const meMember = await this.chatMembersRepository.findOne({
       where: { chatRoom: { id: chatRoomId }, user: { id: userId } },
+      relations: ['lastReadMessage'],
     });
 
-    chatMember.lastSeenMessageId = lastSeenMessage.id;
-    chatMember.lastSeenMessageCreatedAt = lastSeenMessage.createdAt;
+    if (!meMember || !meMember.lastReadMessage) {
+      return 0;
+    }
 
-    await this.chatMembersRepository.save(chatMember);
+    // 2. 메시지 카운트 쿼리
+    const count = await this.messagesRepository
+      .createQueryBuilder('message')
+      .where('message.chatRoomId = :roomId', { roomId: chatRoomId })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where(
+            "DATE_TRUNC('milliseconds', message.createdAt) > :lastReadDate",
+            {
+              lastReadDate: meMember.lastReadMessage.createdAt,
+            },
+          ).orWhere(
+            new Brackets((qb2) => {
+              qb2
+                .where(
+                  "DATE_TRUNC('milliseconds', message.createdAt) = :lastReadDate",
+                  { lastReadDate: meMember.lastReadMessage.createdAt },
+                )
+                .andWhere('message.id > :lastReadId', {
+                  lastReadId: meMember.lastReadMessage.id,
+                });
+            }),
+          );
+        }),
+      )
+      .getCount();
 
-    return { message: 'Successfully update chatMember' };
+    return count;
   }
 
   async checkExistingChatRoom(memberIds: number[]) {

@@ -18,7 +18,4 @@ export class Message extends CoreEntity {
   })
   @JoinColumn({ name: 'chatRoomId' })
   chatRoom: ChatRoom;
-
-  @Column('int', { array: true, default: () => 'ARRAY[]::INTEGER[]' })
-  readBy: number[];
 }

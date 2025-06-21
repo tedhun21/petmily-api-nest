@@ -6,8 +6,8 @@ import { NotificationRead } from './entity/notification_read.entity';
 import { User } from 'src/users/entity/user.entity';
 import { JwtUser } from 'src/auth/decorater/auth.decorator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { RedisService } from 'src/redis/redis.service';
 import { CreateNotificationDto } from './dto/create.notification.dto';
+import { RedisNotificationService } from 'src/redis/notification/redis-notification.service';
 
 @Injectable()
 export class NotificationsService {
@@ -17,7 +17,7 @@ export class NotificationsService {
     @InjectRepository(NotificationRead)
     private readonly notificationReadsRepository: Repository<NotificationRead>,
     private readonly dataSource: DataSource,
-    private readonly redisService: RedisService,
+    private readonly redisNotificationService: RedisNotificationService,
   ) {}
 
   // 트랜잭션
@@ -66,7 +66,7 @@ export class NotificationsService {
 
     await Promise.all(
       allUserIds.map((id) =>
-        this.redisService.incrementUnreadNotificationCount(id),
+        this.redisNotificationService.incrementUnreadNotificationCount(id),
       ),
     );
 
@@ -174,12 +174,12 @@ export class NotificationsService {
     });
 
     // Redis에서 읽지 않은 알림 개수 감소
-    if (isRead && updatedIds.length > 0) {
-      await this.redisService.decrementUnreadNotificationCount(
-        userId,
-        updatedIds.length,
-      );
-    }
+    // if (isRead && updatedIds.length > 0) {
+    //   await this.redisNotificationService.decrementUnreadNotificationCount(
+    //     userId,
+    //     updatedIds.length,
+    //   );
+    // }
 
     return {
       message: 'Successfully read notification',
@@ -188,22 +188,27 @@ export class NotificationsService {
   }
 
   // 유저의 안 읽음 알림 카운트 (자주 조회)
-  async getUnreadCount(jwtUser: JwtUser) {
-    const { id: userId } = jwtUser;
+  // async getUnreadCount(jwtUser: JwtUser) {
+  //   const { id: userId } = jwtUser;
 
-    const cached =
-      await this.redisService.getUserUnreadNotificationCount(userId);
+  //   const cached =
+  //     await this.redisNotificationService.getUserUnreadNotificationCount(
+  //       userId,
+  //     );
 
-    if (cached) {
-      return cached;
-    }
+  //   if (cached) {
+  //     return cached;
+  //   }
 
-    const unreadCount = await this.notificationReadsRepository.count({
-      where: { user: { id: userId }, isRead: false },
-    });
+  //   const unreadCount = await this.notificationReadsRepository.count({
+  //     where: { user: { id: userId }, isRead: false },
+  //   });
 
-    // DB에서 가져온 unreadCount redis에 저장
-    await this.redisService.setUserUnreadNotificationCount(userId, unreadCount);
-    return unreadCount;
-  }
+  //   // DB에서 가져온 unreadCount redis에 저장
+  //   await this.redisNotificationService.setUserUnreadNotificationCount(
+  //     userId,
+  //     unreadCount,
+  //   );
+  //   return unreadCount;
+  // }
 }

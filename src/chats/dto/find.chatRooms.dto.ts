@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDate, IsNumber, IsOptional } from 'class-validator';
+import { IsDateString, IsNumber, IsOptional } from 'class-validator';
 
 export class FindChatRoomsDto {
   @IsOptional()
@@ -8,8 +8,8 @@ export class FindChatRoomsDto {
   cursorId?: number;
 
   @IsOptional()
-  @IsDate()
-  cursorCreatedAt?: Date;
+  @IsDateString()
+  cursorDate?: string;
 
   @Type(() => Number)
   @IsNumber()

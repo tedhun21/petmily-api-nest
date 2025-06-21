@@ -48,6 +48,12 @@ export class ChatsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('unread-count')
+  getUnreadCountByUser(@AuthUser() jwtUser: JwtUser) {
+    return this.chatsService.getUnreadMessageCountByUser(jwtUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get(':chatRoomId')
   findChatRoom(
     @AuthUser() jwtUser: JwtUser,

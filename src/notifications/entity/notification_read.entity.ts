@@ -18,6 +18,6 @@ export class NotificationRead extends CoreEntity {
   @Column({ type: 'boolean', default: false })
   isRead: boolean;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   readAt: Date;
 }

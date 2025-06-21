@@ -89,31 +89,25 @@ export class ChatsGateWay {
     @MessageBody() data: ReadMessageDto,
   ) {
     const token = client.handshake.auth.token;
-    console.log('---------------------------data', data);
-    const { chatRoomId, lastSeenMessage } = data;
+
+    const { chatRoomId, lastReadMessageId, lastReadMessageCreatedAt } = data;
 
     try {
       const decoded = await this.jwtService.verify(token);
 
-      // 1. 각 메시지의 readBy 업데이트
-      await this.chatsService.updateReadByMessages(
-        decoded,
-        chatRoomId,
-        lastSeenMessage,
-      );
-
-      // 2. chatMember의 lastSeenMessageCreatedAt 업데이트
-      await this.chatsService.updateLastMessageChatMember(
-        decoded,
-        chatRoomId,
-        lastSeenMessage,
-      );
+      await this.chatsService.markMessagesAsRead(decoded, chatRoomId, {
+        lastReadMessageId,
+        lastReadMessageCreatedAt,
+      });
 
       // 채팅방에 있는 모든 참여자에게 (채팅방 내부) 읽음 표시 broadcast
       this.server
         .to(`chatRoom_${chatRoomId.toString()}`)
         .emit('chat:room:read:update', {
-          lastSeenMessage,
+          lastReadMessage: {
+            id: lastReadMessageId,
+            createdAt: lastReadMessageCreatedAt,
+          },
           userId: decoded.id,
         });
 
@@ -121,8 +115,12 @@ export class ChatsGateWay {
       this.server
         .to(`chatUser_${decoded.id}`)
         .emit('chat:user:newMessage:clear', {
-          lastSeenMessage,
+          lastReadMessage: {
+            id: lastReadMessageId,
+            createdAt: lastReadMessageCreatedAt,
+          },
           userId: decoded.id,
+          chatRoom: { id: chatRoomId },
         });
     } catch (e) {}
   }

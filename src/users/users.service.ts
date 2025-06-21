@@ -20,9 +20,10 @@ import { ReservationStatus } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { JwtService } from '@nestjs/jwt';
 import { UpdateFavoriteDto } from './dto/updateFavorite.user';
-import { RedisService } from 'src/redis/redis.service';
 import { isValidLocation } from 'src/common/location/location.utils';
 import { FindUserByEmailOrNicknameDto } from './dto/find.petsitterByNickname.dto';
+import { RedisLocationService } from 'src/redis/location/redis-location.service';
+import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()
 export class UsersService {
@@ -33,6 +34,7 @@ export class UsersService {
     private readonly uploadsService: UploadsService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
+    private readonly redisLocationService: RedisLocationService,
   ) {}
 
   async create(createUserDto: CreateUserDto) {
@@ -340,7 +342,7 @@ export class UsersService {
       if (isValidLocation(location)) {
         try {
           if (this.redisService.getClient().status === 'ready') {
-            this.redisService.incrementLocationCount(location);
+            this.redisLocationService.incrementLocationCount(location);
           }
         } catch (error) {
           console.error('❌ Redis 위치 카운트 증가 실패:', error);

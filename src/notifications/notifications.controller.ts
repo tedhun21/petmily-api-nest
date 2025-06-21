@@ -75,9 +75,9 @@ export class NotificationsController {
     return this.notificationsService.updateNotificationRead(jwtUser, body);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Get('unreadCount')
-  getUnreadCount(@AuthUser() jwtUser: JwtUser) {
-    return this.notificationsService.getUnreadCount(jwtUser);
-  }
+  // @UseGuards(JwtAuthGuard)
+  // @Get('unreadCount')
+  // getUnreadCount(@AuthUser() jwtUser: JwtUser) {
+  //   return this.notificationsService.getUnreadCount(jwtUser);
+  // }
 }
