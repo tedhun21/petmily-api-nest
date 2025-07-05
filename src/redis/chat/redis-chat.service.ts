@@ -76,8 +76,6 @@ export class RedisChatService {
       result[chatRoomId] = Number.isNaN(parsed) ? 0 : parsed;
     }
 
-    console.log('result', result);
-
     return result;
   }
 

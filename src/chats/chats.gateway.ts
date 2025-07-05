@@ -57,17 +57,28 @@ export class ChatsGateWay {
       // token decode
       const decoded = await this.jwtService.verify(token);
 
+      // 1. 메시지 생성
       const newMessage = await this.chatsService.createMessage(
         decoded,
         chatRoomId,
         message,
       );
 
+      console.log('newMessage', newMessage);
+
+      const roomMessagePayload = {
+        ...newMessage,
+        chatRoom: {
+          id: newMessage.chatRoom.id,
+        },
+        sender: { ...newMessage.sender },
+      };
+
       if (newMessage && chatRoomId && opponentIds.length > 0) {
         // 채팅방에 메세지 전송
         this.server
           .to(`chatRoom_${chatRoomId.toString()}`)
-          .emit('chat:room:message:new', newMessage);
+          .emit('chat:room:message:new', roomMessagePayload);
 
         // 상대방 유저에게 전송
         for (const memberId of opponentIds) {
@@ -100,27 +111,23 @@ export class ChatsGateWay {
         lastReadMessageCreatedAt,
       });
 
+      const lastReadMessage = {
+        id: lastReadMessageId,
+        createdAt: lastReadMessageCreatedAt,
+        chatRoom: { id: chatRoomId },
+      };
+
       // 채팅방에 있는 모든 참여자에게 (채팅방 내부) 읽음 표시 broadcast
       this.server
         .to(`chatRoom_${chatRoomId.toString()}`)
-        .emit('chat:room:read:update', {
-          lastReadMessage: {
-            id: lastReadMessageId,
-            createdAt: lastReadMessageCreatedAt,
-          },
-          userId: decoded.id,
-        });
+        .emit('chat:room:read:update', { lastReadMessage, readBy: decoded.id });
 
       // 해당 유저에세 개인적 (채팅방 외부)
       this.server
         .to(`chatUser_${decoded.id}`)
         .emit('chat:user:newMessage:clear', {
-          lastReadMessage: {
-            id: lastReadMessageId,
-            createdAt: lastReadMessageCreatedAt,
-          },
-          userId: decoded.id,
-          chatRoom: { id: chatRoomId },
+          lastReadMessage,
+          readBy: decoded.id,
         });
     } catch (e) {}
   }

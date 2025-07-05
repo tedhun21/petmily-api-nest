@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { IsArray, IsNumber, IsString } from 'class-validator';
 
 export class SendMessageDto {
@@ -6,7 +7,8 @@ export class SendMessageDto {
 
   @IsArray()
   @IsNumber({}, { each: true })
-  opponentIds: number[];
+  @Type(() => Number)
+  opponentIds?: number[];
 
   @IsString()
   message: string;

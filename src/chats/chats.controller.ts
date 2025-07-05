@@ -42,9 +42,12 @@ export class ChatsController {
   @Get('by-users')
   findChatRoomByUsers(
     @AuthUser() jwtUser: JwtUser,
-    @Query() query: FindChatRoomByUsersDto,
+    @Query() findChatRoomByUsersDto: FindChatRoomByUsersDto,
   ) {
-    return this.chatsService.findChatRoomByUsers(jwtUser, query);
+    return this.chatsService.findChatRoomByUsers(
+      jwtUser,
+      findChatRoomByUsersDto,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -55,21 +58,21 @@ export class ChatsController {
 
   @UseGuards(JwtAuthGuard)
   @Get(':chatRoomId')
-  findChatRoom(
+  getChatRoom(
     @AuthUser() jwtUser: JwtUser,
     @Param('chatRoomId', ParseIntPipe) chatRoomId: number,
   ) {
-    return this.chatsService.findChatRoom(jwtUser, chatRoomId);
+    return this.chatsService.getChatRoom(jwtUser, chatRoomId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':chatRoomId/messages')
-  findMessages(
+  getMessages(
     @AuthUser() jwtUser: JwtUser,
     @Param('chatRoomId', ParseIntPipe) chatRoomId: number,
     @Query() findMessagesDto: FindMessagesDto,
   ) {
-    return this.chatsService.findMessages(jwtUser, chatRoomId, findMessagesDto);
+    return this.chatsService.getMessages(jwtUser, chatRoomId, findMessagesDto);
   }
 
   @UseGuards(JwtAuthGuard)

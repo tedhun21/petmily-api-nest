@@ -4,10 +4,9 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from 'src/users/entity/user.entity';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, LessThan, Repository } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { Message } from './entity/message.entity';
 import { ChatRoom } from './entity/chatRoom.entity';
 import { FindMessagesDto } from './dto/find.messages.dto';
@@ -31,13 +30,11 @@ export class ChatsService {
     private readonly redisChatService: RedisChatService,
   ) {}
 
-  async createChatRoom(
-    user: { id: number; role: UserRole },
-    createChatRoomDto: CreateChatRoomDto,
-  ) {
+  async createChatRoom(jwtUser: JwtUser, createChatRoomDto: CreateChatRoomDto) {
+    const { id: userId } = jwtUser;
     const { opponentIds } = createChatRoomDto;
-    if (!opponentIds.includes(user.id)) {
-      opponentIds.push(user.id);
+    if (!opponentIds.includes(userId)) {
+      opponentIds.push(userId);
     }
 
     const chatRoomExists = await this.checkExistingChatRoom(opponentIds);
@@ -81,9 +78,9 @@ export class ChatsService {
       }
 
       // me와 others 구분
-      const me = savedChatMembers.find((member) => member.user.id === user.id);
+      const me = savedChatMembers.find((member) => member.user.id === userId);
       const others = savedChatMembers.filter(
-        (member) => member.user.id !== user.id,
+        (member) => member.user.id !== userId,
       );
 
       if (!me) {
@@ -96,18 +93,8 @@ export class ChatsService {
       return {
         id: savedChatRoom.id,
         chatMembers: {
-          me: {
-            id: me.user.id,
-            nickname: me.user.nickname,
-            photo: me.user.photo,
-            role: me.user.role,
-          },
-          others: others.map((member) => ({
-            id: member.user.id,
-            nickname: member.user.nickname,
-            photo: member.user.photo,
-            role: member.user.role,
-          })),
+          me,
+          others,
         },
       };
     });
@@ -159,7 +146,7 @@ export class ChatsService {
 
     const chatRooms = await qb.getMany();
 
-    const hasNextPage = chatRooms.length > pageSize;
+    const hasNextPage = chatRooms.length === pageSize;
 
     const processed = await Promise.all(
       chatRooms.map(async (room) => {
@@ -212,7 +199,7 @@ export class ChatsService {
     return { results: processed, pagination: { nextCursor, hasNextPage } };
   }
 
-  async findChatRoom(jwtUser: JwtUser, chatRoomId: number) {
+  async getChatRoom(jwtUser: JwtUser, chatRoomId: number) {
     const { id: userId } = jwtUser;
 
     try {
@@ -284,7 +271,7 @@ export class ChatsService {
     return modifiedChatRoom;
   }
 
-  async findMessages(
+  async getMessages(
     jwtUser: JwtUser,
     chatRoomId: number,
     findMessagesDto: FindMessagesDto,
@@ -315,33 +302,50 @@ export class ChatsService {
     }
 
     // 커서 기반으로 메시지 조회
-    const queryOptions: any = {
-      where: { chatRoom: { id: +chatRoomId } },
-      order: { createdAt: 'DESC' },
-      relations: ['sender'],
-      select: {
-        id: true,
-        content: true,
-        createdAt: true,
-        sender: { id: true, nickname: true, photo: true, role: true },
-      },
-      take: pageSize,
-    };
+
+    const qb = await this.messagesRepository
+      .createQueryBuilder('message')
+      .where('message.chatRoomId = :chatRoomId', { chatRoomId })
+      .leftJoin('message.sender', 'sender')
+      .addSelect([
+        'sender.id',
+        'sender.nickname',
+        'sender.photo',
+        'sender.role',
+      ])
+      .orderBy('message.createdAt', 'DESC')
+      .addOrderBy('message.id', 'DESC')
+      .limit(pageSize);
 
     if (cursor) {
-      // cursor는 마지막 메시지의 id로 사용
       const cursorMessage = await this.messagesRepository.findOne({
-        where: { id: cursor, chatRoom: { id: +chatRoomId } },
+        where: { id: cursor },
         select: ['id', 'createdAt'],
       });
 
-      // 커서 이후의 메시지만 조회
-      queryOptions.where.createdAt = LessThan(cursorMessage.createdAt);
+      if (!cursorMessage) {
+        throw new NotFoundException('Cursor message not found');
+      }
+
+      // DATE_TRUNC와 보조 키로 비교
+      qb.andWhere(
+        new Brackets((qb) => {
+          qb.where(
+            `DATE_TRUNC('milliseconds', message.createdAt) < :createdAt`,
+            { createdAt: cursorMessage.createdAt },
+          ).orWhere(
+            new Brackets((qb) => {
+              qb.where(
+                `DATE_TRUNC('milliseconds', message.createdAt) = :createdAt`,
+                { createdAt: cursorMessage.createdAt },
+              ).andWhere('message.id < :id', { id: cursorMessage.id });
+            }),
+          );
+        }),
+      );
     }
 
-    // 메시지 조회
-    const [messages, total] =
-      await this.messagesRepository.findAndCount(queryOptions);
+    const [messages, total] = await qb.getManyAndCount();
 
     // 커서가 있으면 다음 페이지가 존재하는지 확인
     const hasNextPage = messages.length === pageSize;
@@ -379,18 +383,17 @@ export class ChatsService {
     // 트랜잭션
     return await this.dataSource.transaction(async (manager) => {
       // 1. 메세지 생성 및 저장
-      const newMessage = manager.create(Message, {
+      const savedMessage = await manager.save(Message, {
         chatRoom: { id: chatRoom.id },
         sender: { id: senderId },
         content: message,
       });
-      const savedMessage = await manager.save(Message, newMessage);
 
       // 2. chatRoom의 `lastMessage` 업데이트
       chatRoom.lastMessage = savedMessage; //
       await manager.save(chatRoom);
 
-      // 3. chatRoom에 해당하는 chatMember 뷸러오기
+      // 3. chatRoom에 해당하는 chatMember 뷸러오기ㅌ
       const chatMembers = await manager.find(ChatMember, {
         where: { chatRoom: { id: chatRoom.id } },
         relations: ['user'],
@@ -413,7 +416,35 @@ export class ChatsService {
         }),
       );
 
-      return savedMessage;
+      // 5. 만들어진 메시지 다시 조회 (쿼리빌더)
+      const fullMessage = await manager
+        .getRepository(Message)
+        .createQueryBuilder('message') // 여기 alias 붙여야 함!
+        .leftJoin('message.sender', 'sender')
+        .addSelect([
+          'sender.id',
+          'sender.nickname',
+          'sender.photo',
+          'sender.role',
+        ])
+        .leftJoinAndSelect('message.chatRoom', 'chatRoom')
+        .leftJoinAndSelect('chatRoom.chatMembers', 'chatMembers')
+        .leftJoinAndSelect('chatMembers.user', 'member')
+        .where('message.id = :id', { id: savedMessage.id })
+        .getOne();
+
+      const me = fullMessage.chatRoom.chatMembers.find(
+        (member) => member.user?.id === senderId,
+      );
+
+      const others = fullMessage.chatRoom.chatMembers.filter(
+        (member) => member.user?.id !== senderId,
+      );
+
+      return {
+        ...fullMessage,
+        chatRoom: { ...fullMessage.chatRoom, chatMembers: { me, others } },
+      };
     });
   }
 
@@ -557,6 +588,7 @@ export class ChatsService {
     return count;
   }
 
+  // 헬퍼 함수: 채팅방 여부
   async checkExistingChatRoom(memberIds: number[]) {
     const subQuery = this.chatRoomsRepository
       .createQueryBuilder('chatRoom')
