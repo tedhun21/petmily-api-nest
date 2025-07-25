@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
@@ -12,6 +13,7 @@ import { RedisService } from 'src/redis/redis.service';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class NotificationsGateway implements OnGatewayInit {
+  private readonly logger = new Logger(NotificationsGateway.name);
   constructor(
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
@@ -36,28 +38,28 @@ export class NotificationsGateway implements OnGatewayInit {
       );
       // Redis 연결 성공 시, Socket.IO Redis 어댑터 설정
       this.server.adapter(createAdapter(pubClient, subClient) as any);
-      console.log('NotificationGateway Socket.IO Redis 어댑터 설정 완료');
+      this.logger.log('NotificationGateway Socket.IO Redis 어댑터 설정 완료');
     } catch (error) {
-      console.error(
+      this.logger.error(
         'NotificationGateway Socket.IO Redis 어댑터 설정 오류:',
         error,
       );
     }
   }
 
-  @SubscribeMessage('joinNotiUser')
+  @SubscribeMessage('noti:user:join')
   async handleJoinNoti(@ConnectedSocket() client: Socket) {
-    const token = client.handshake.auth.token;
+    const { access_token } = client.handshake.auth;
 
     try {
-      const decoded = await this.jwtService.verify(token);
+      const decoded = await this.jwtService.verifyAsync(access_token);
       const { id: userId } = decoded;
 
-      console.log(`🟢 User ${userId} joined room notiUser_${userId}`);
+      this.logger.log(`🟢 User ${userId} joined room notiUser_${userId}`);
 
       client.join(`notiUser_${userId}`);
     } catch (e) {
-      console.error(e);
+      this.logger.error('🔴 Invalid token for noti:user:join:', e.message);
     }
   }
 
@@ -66,7 +68,7 @@ export class NotificationsGateway implements OnGatewayInit {
     for (const userId of userIds) {
       this.server
         .to(`notiUser_${userId.toString()}`)
-        .emit('notification', notification);
+        .emit('noti:user:newNoti', notification);
     }
   }
 }

@@ -10,9 +10,12 @@ import { Server, Socket } from 'socket.io';
 import { ChatsService } from './chats.service';
 import { SendMessageDto } from './dto/send.message.dto';
 import { ReadMessageDto } from './dto/read.message.dto';
+import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class ChatsGateWay {
+  private readonly logger = new Logger(ChatsGateWay.name);
+
   constructor(
     private readonly chatsService: ChatsService,
     private readonly jwtService: JwtService,
@@ -27,20 +30,20 @@ export class ChatsGateWay {
     @ConnectedSocket() client: Socket,
   ) {
     client.join(`chatRoom_${chatRoomId}`);
-    console.log(`Client joined room: ${chatRoomId}`);
+    this.logger.log(`Client joined room: ${chatRoomId}`);
   }
 
   @SubscribeMessage('chat:user:join')
   async handleJoinChatUser(@ConnectedSocket() client: Socket) {
-    const token = client.handshake.auth.token;
+    const { access_token } = client.handshake.auth;
 
     try {
-      const { id: userId } = await this.jwtService.verify(token);
+      const { id: userId } = await this.jwtService.verifyAsync(access_token);
 
       client.join(`chatUser_${userId.toString()}`);
-      console.log(`User ${userId} joined their own room`);
+      this.logger.log(`🟢 User ${userId} joined their own room`);
     } catch (e) {
-      console.error('Join user failed:', e);
+      this.logger.error('🔴 Invalid token for chat:user:join:', e);
     }
   }
 
@@ -50,12 +53,12 @@ export class ChatsGateWay {
     data: SendMessageDto,
     @ConnectedSocket() client: Socket,
   ) {
-    const token = client.handshake.auth.token; // Socket.IO 미들웨어로 token 잡기
+    const { access_token } = client.handshake.auth; // Socket.IO 미들웨어로 token 잡기
     const { chatRoomId, opponentIds, message } = data;
 
     try {
       // token decode
-      const decoded = await this.jwtService.verify(token);
+      const decoded = await this.jwtService.verifyAsync(access_token);
 
       // 1. 메시지 생성
       const newMessage = await this.chatsService.createMessage(
@@ -63,8 +66,6 @@ export class ChatsGateWay {
         chatRoomId,
         message,
       );
-
-      console.log('newMessage', newMessage);
 
       const roomMessagePayload = {
         ...newMessage,
@@ -99,12 +100,12 @@ export class ChatsGateWay {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ReadMessageDto,
   ) {
-    const token = client.handshake.auth.token;
+    const { access_token } = client.handshake.auth;
 
     const { chatRoomId, lastReadMessageId, lastReadMessageCreatedAt } = data;
 
     try {
-      const decoded = await this.jwtService.verify(token);
+      const decoded = await this.jwtService.verifyAsync(access_token);
 
       await this.chatsService.markMessagesAsRead(decoded, chatRoomId, {
         lastReadMessageId,

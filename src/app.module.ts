@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { User } from './users/entity/user.entity';
 import { AuthModule } from './auth/auth.module';
 import { PetsModule } from './pets/pets.module';
@@ -27,6 +27,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { Notification } from './notifications/entity/notification.entity';
 import { NotificationRead } from './notifications/entity/notification_read.entity';
 import { KafkaModule } from './kafka/kafka.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -69,8 +70,17 @@ import { KafkaModule } from './kafka/kafka.module';
     ChatsModule,
     MapsModule,
     SearchModule,
-    RedisModule,
     NotificationsModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_ACCESS_SECRET'),
+        signOptions: { expiresIn: '1h' },
+      }),
+      inject: [ConfigService],
+      global: true,
+    }),
+    RedisModule,
     KafkaModule,
   ],
   controllers: [],

@@ -18,12 +18,13 @@ import { ReservationsService } from 'src/reservations/reservations.service';
 import { ParamDto } from 'src/common/dto/param.dto';
 import { ReservationStatus } from 'src/reservations/entity/reservation.entity';
 import { UploadsService } from 'src/uploads/uploads.service';
-import { JwtService } from '@nestjs/jwt';
 import { UpdateFavoriteDto } from './dto/updateFavorite.user';
 import { isValidLocation } from 'src/common/location/location.utils';
 import { FindUserByEmailOrNicknameDto } from './dto/find.petsitterByNickname.dto';
 import { RedisLocationService } from 'src/redis/location/redis-location.service';
 import { RedisService } from 'src/redis/redis.service';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UsersService {
@@ -35,6 +36,7 @@ export class UsersService {
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     private readonly redisLocationService: RedisLocationService,
+    private readonly configService: ConfigService,
   ) {}
 
   async create(createUserDto: CreateUserDto) {
@@ -229,7 +231,9 @@ export class UsersService {
     let newJwt = null;
     if (role && role !== currentRole) {
       const payload = { id: user.id, role };
-      newJwt = await this.jwtService.signAsync(payload);
+      newJwt = await this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('JWT_ACCESS_TOKEN'),
+      });
     }
 
     if (password) {
@@ -573,7 +577,7 @@ export class UsersService {
     }
   }
 
-  async validateUserById(id: number) {
+  async findUserById(id: number) {
     const user = await this.usersRepository.findOne({
       where: { id },
       select: ['id', 'role'],
@@ -586,12 +590,31 @@ export class UsersService {
     return user;
   }
 
-  async findByEmailWithPassword(email: string) {
+  async findUserByEmail(email: string) {
     const user = await this.usersRepository.findOne({
       where: { email },
-      select: ['id', 'email', 'role', 'password'],
     });
 
+    if (!user) {
+      throw new NotFoundException('No user found with this Email');
+    }
+
     return user;
+  }
+
+  async validateUserByEmailAndPassword(email: string, password: string) {
+    const user = await this.findUserByEmail(email);
+
+    if (!user) {
+      throw new NotFoundException('No user found');
+    }
+
+    const ok = await user.checkPassword(password);
+
+    if (ok) {
+      return user;
+    }
+
+    return null;
   }
 }

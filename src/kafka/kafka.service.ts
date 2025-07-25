@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Logger,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
@@ -10,10 +11,12 @@ import { ClientKafka } from '@nestjs/microservices';
 export class KafkaService implements OnModuleInit, OnModuleDestroy {
   private producer: ClientKafka | null = null;
   private consumer: ClientKafka | null = null;
+  private readonly logger = new Logger(KafkaService.name);
 
   constructor(
     @Inject('KAFKA_SERVICE') private readonly kafkaClient: ClientKafka,
   ) {}
+
   async onModuleInit() {
     try {
       this.producer = this.kafkaClient;
@@ -22,9 +25,9 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       await this.producer.connect();
       await this.consumer.connect();
 
-      console.log('✅ Kafka connected');
+      this.logger.log('✅ Kafka connected');
     } catch (error) {
-      console.error('⚠️ Error initializing Kafka:', error);
+      this.logger.error('⚠️ Error initializing Kafka', error);
     }
   }
 
@@ -32,23 +35,23 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
     try {
       if (this.kafkaClient) {
         await this.kafkaClient.close();
-        console.log('🛑 Kafka connection closed');
+        this.logger.log('🛑 Kafka connection closed');
       }
     } catch (error) {
-      console.error('⚠️ Error closing Kafka connection:', error);
+      this.logger.error('⚠️ Error closing Kafka connection:', error);
     }
   }
 
   getProducer(): ClientKafka | null {
     if (!this.producer) {
-      console.warn('⚠️ Kafka producer is not available');
+      this.logger.warn('⚠️ Kafka producer is not available');
     }
     return this.producer;
   }
 
   getConsumer(): ClientKafka | null {
     if (!this.consumer) {
-      console.warn('⚠️ Kafka consumer is not available');
+      this.logger.warn('⚠️ Kafka consumer is not available');
     }
     return this.consumer;
   }

@@ -40,7 +40,7 @@ export class MailService {
   }
 
   async generateAndSaveVerificationCode(email: string) {
-    const user = await this.usersService.findByEmailWithPassword(email);
+    const user = await this.usersService.findUserByEmail(email);
 
     if (!user) {
       throw new NotFoundException('No user found');

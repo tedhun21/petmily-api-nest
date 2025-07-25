@@ -12,6 +12,7 @@ export interface JwtUser {
 export const AuthUser = createParamDecorator<JwtUser>(
   (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
+
     return request.user;
   },
 );
