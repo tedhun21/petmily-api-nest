@@ -12,9 +12,11 @@ import { ReservationsService } from './reservations.service';
 import { ReservationStatus } from './entity/reservation.entity';
 import { RedisService } from 'src/redis/redis.service';
 import { createAdapter } from '@socket.io/redis-adapter';
+import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class ReservationsGateWay implements OnGatewayInit {
+  private readonly logger = new Logger(ReservationsGateWay.name);
   constructor(
     private readonly jwtService: JwtService,
     private readonly reservationsService: ReservationsService,
@@ -41,7 +43,7 @@ export class ReservationsGateWay implements OnGatewayInit {
       );
       // Redis 연결 성공 시, Socket.IO Redis 어댑터 설정
       this.server.adapter(createAdapter(pubClient, subClient) as any);
-      console.log('ReservationGateway Socket.IO Redis 어댑터 설정 완료');
+      this.logger.log('ReservationGateway Socket.IO Redis 어댑터 설정 완료');
     } catch (error) {
       console.error(
         'ReservationGateway Socket.IO Redis 어댑터 설정 오류:',
@@ -56,7 +58,7 @@ export class ReservationsGateWay implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
   ) {
     client.join(`reservation_${reservationId}`);
-    console.log(`Client joined reservation: ${reservationId}`);
+    this.logger.log(`Client joined reservation: ${reservationId}`);
   }
 
   @SubscribeMessage('updateStatus')

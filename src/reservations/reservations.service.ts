@@ -80,7 +80,6 @@ export class ReservationsService implements OnModuleInit {
         message: 'Successfully create a reservation',
       };
     } catch (e) {
-      console.log(e);
       throw new InternalServerErrorException('Fail to create a reservation');
     }
   }

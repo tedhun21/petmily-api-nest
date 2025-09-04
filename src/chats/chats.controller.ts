@@ -74,14 +74,4 @@ export class ChatsController {
   ) {
     return this.chatsService.getMessages(jwtUser, chatRoomId, findMessagesDto);
   }
-
-  @UseGuards(JwtAuthGuard)
-  @Post(':chatRoomId/messages')
-  createMessage(
-    @AuthUser() jwtUser: JwtUser,
-    @Param('chatRoomId', ParseIntPipe) chatRoomId: number,
-    @Body() message: string,
-  ) {
-    return this.chatsService.createMessage(jwtUser, chatRoomId, message);
-  }
 }

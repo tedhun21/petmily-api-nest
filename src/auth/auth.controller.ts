@@ -20,8 +20,6 @@ export class AuthController {
 
   private getBaseCookieOptions(): Omit<CookieOptions, 'maxAge'> {
     const isProduction = this.configService.get<string>('NODE_ENV') === 'prod';
-    console.log('isProduction:', isProduction); // <- 꼭 찍어보세요
-    console.log('NODE_ENV:', this.configService.get<string>('NODE_ENV'));
 
     return {
       httpOnly: true, // 자바스크립트로 읽기 방지
@@ -38,7 +36,7 @@ export class AuthController {
     };
   }
 
-  @Post('login') // 로그인
+  @Post('login')
   async signInWithCredentials(
     @Body() signInDto: SignInDto,
     @Res({ passthrough: true }) res: Response,
@@ -57,8 +55,6 @@ export class AuthController {
   ) {
     const refreshToken = req.cookies?.refresh_token;
 
-    console.log('-----------Refresh Input------------', refreshToken);
-
     if (!refreshToken) {
       throw new UnauthorizedException('No refresh token found');
     }
@@ -70,9 +66,6 @@ export class AuthController {
 
       // 새 refresh 토큰 쿠키로 덮어쓰기
       res.cookie('refresh_token', newRefresh, this.getCookieOptions());
-
-      console.log('access_token', access_token);
-      console.log('refresh_token', newRefresh);
 
       return { access_token };
     } catch (e) {
@@ -89,15 +82,10 @@ export class AuthController {
   }
 
   @Post('logout') // 로그아웃 (Refresh Token 무효화)
-  async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const { refresh_token } = req.cookies;
 
     res.clearCookie('refresh_token', this.getBaseCookieOptions());
     return await this.authService.logout(refresh_token);
   }
-
-  // @Post('email/code')
-  // verifyEmail(@Body() verifyEmailInput: VerifyEmailInput) {
-  //   return this.authService.validateEmailCode(verifyEmailInput);
-  // }
 }

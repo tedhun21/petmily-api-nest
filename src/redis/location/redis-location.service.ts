@@ -1,15 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis.service';
 import { getLocations } from 'src/common/location/location.utils';
 
 @Injectable()
 export class RedisLocationService {
+  private readonly logger = new Logger(RedisLocationService.name);
   constructor(private readonly redisService: RedisService) {}
 
   // 서버 시작시에 locations 데이터 등록
   async seedLocations() {
     try {
-      console.log('REDIS: 🔄 Saving location data to Redis...');
+      this.logger.log('REDIS: 🔄 Saving location data to Redis...');
       const redisClient = this.redisService.getClient();
 
       const locations = getLocations();
@@ -25,9 +26,12 @@ export class RedisLocationService {
       });
 
       await pipeline.exec();
-      console.log('REDIS: ✅ Location data successfully saved to Redis!');
+      this.logger.log('REDIS: ✅ Location data successfully saved to Redis!');
     } catch (error) {
-      console.error('REDIS: ❌ Failed to save location data to Redis:', error);
+      this.logger.error(
+        'REDIS: ❌ Failed to save location data to Redis:',
+        error,
+      );
     }
   }
 

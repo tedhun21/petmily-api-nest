@@ -10,7 +10,8 @@ import { Server, Socket } from 'socket.io';
 import { ChatsService } from './chats.service';
 import { SendMessageDto } from './dto/send.message.dto';
 import { ReadMessageDto } from './dto/read.message.dto';
-import { Logger } from '@nestjs/common';
+import { Logger, UseGuards } from '@nestjs/common';
+import { WsJwtGuard } from 'src/common/guard/WsJwtGuard';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class ChatsGateWay {
@@ -23,22 +24,11 @@ export class ChatsGateWay {
   @WebSocketServer()
   server: Server;
 
-  // 유저가 채팅방에 조인
-  @SubscribeMessage('chat:room:join')
-  handleJoinChatRoom(
-    @MessageBody() chatRoomId: string,
-    @ConnectedSocket() client: Socket,
-  ) {
-    client.join(`chatRoom_${chatRoomId}`);
-    this.logger.log(`Client joined room: ${chatRoomId}`);
-  }
-
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('chat:user:join')
   async handleJoinChatUser(@ConnectedSocket() client: Socket) {
-    const { access_token } = client.handshake.auth;
-
     try {
-      const { id: userId } = await this.jwtService.verifyAsync(access_token);
+      const { id: userId } = client.data.user;
 
       client.join(`chatUser_${userId.toString()}`);
       this.logger.log(`🟢 User ${userId} joined their own room`);
@@ -47,51 +37,101 @@ export class ChatsGateWay {
     }
   }
 
-  @SubscribeMessage('chat:message:new')
-  async handleSendMessage(
-    @MessageBody()
-    data: SendMessageDto,
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('chat:room:join')
+  async handleJoinChatRoom(
     @ConnectedSocket() client: Socket,
+    @MessageBody() data,
   ) {
-    const { access_token } = client.handshake.auth; // Socket.IO 미들웨어로 token 잡기
-    const { chatRoomId, opponentIds, message } = data;
+    const { id: userId } = client.data.user;
+    const { chatRoomId } = data;
 
     try {
-      // token decode
+      client.join(`chatRoom_${chatRoomId}`);
+      this.logger.log(`User ${userId} joined chatRoom_${chatRoomId}`);
+    } catch (e) {
+      this.logger.error('Invalid token for chat:room:join:', e);
+    }
+  }
+
+  @SubscribeMessage('chat:message:new')
+  async handleSendMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: SendMessageDto,
+  ) {
+    const { chatRoomId, opponentIds, tempMessageId, content } = data;
+    const { access_token } = client.handshake.auth;
+
+    try {
+      // 1. 토큰 검증
       const decoded = await this.jwtService.verifyAsync(access_token);
 
-      // 1. 메시지 생성
-      const newMessage = await this.chatsService.createMessage(
-        decoded,
+      // 2. 메시지 생성
+      const newMessage = await this.chatsService.createMessage(decoded, {
         chatRoomId,
-        message,
+        opponentIds,
+        content,
+      });
+
+      if (!newMessage) {
+        return { success: false, error: 'sendFailed', id: tempMessageId };
+      }
+
+      const newChatRoomId = newMessage.chatRoom.id;
+
+      // 채팅방 참여자 목록
+      const memberIds =
+        await this.chatsService.getChatRoomMemberIds(newChatRoomId);
+
+      // 채팅방에 없는 유저에게 메시지 전송
+      const socketsInRoom = await this.server
+        .in(`chatRoom_${newMessage.chatRoom.id}`)
+        .fetchSockets();
+      const userIdsInRoom = socketsInRoom.map((s) => s.data.user.id);
+      const userIdsNotInRoom = memberIds.filter(
+        (id) => !userIdsInRoom.includes(id),
       );
 
-      const roomMessagePayload = {
-        ...newMessage,
-        chatRoom: {
-          id: newMessage.chatRoom.id,
-        },
-        sender: { ...newMessage.sender },
-      };
-
-      if (newMessage && chatRoomId && opponentIds.length > 0) {
-        // 채팅방에 메세지 전송
+      // 분기 처리
+      if (chatRoomId && !opponentIds) {
+        // 채팅방 안에 있는 유저에게
         this.server
-          .to(`chatRoom_${chatRoomId.toString()}`)
-          .emit('chat:room:message:new', roomMessagePayload);
+          .to(`chatRoom_${newChatRoomId}`)
+          .emit('chat:room:message:new', { newMessage, tempMessageId });
 
-        // 상대방 유저에게 전송
-        for (const memberId of opponentIds) {
-          if (memberId !== decoded.id) {
-            this.server
-              .to(`chatUser_${memberId.toString()}`)
-              .emit('chat:user:message:new', newMessage);
-          }
+        // 채팅방 외부에 있는 유저에게
+        for (const userId of userIdsNotInRoom) {
+          this.server
+            .to(`chatUser_${userId}`)
+            .emit('chat:user:message:new', newMessage);
         }
+
+        return {
+          success: true,
+          newMessage,
+          tempMessageId,
+        };
+      } else if (!chatRoomId && opponentIds) {
+        // 채팅방 멤버들에게 일괄 방송
+        for (const userId of memberIds) {
+          this.server
+            .to(`chatUser_${userId}`)
+            .emit('chat:user:message:new', newMessage);
+        }
+
+        return {
+          success: true,
+          id: newMessage.id,
+          chatRoomId: newChatRoomId,
+          tempMessageId,
+        };
       }
     } catch (e) {
-      console.error(e);
+      return {
+        success: false,
+        error: e.name,
+        id: tempMessageId,
+      };
     }
   }
 
@@ -114,14 +154,16 @@ export class ChatsGateWay {
 
       const lastReadMessage = {
         id: lastReadMessageId,
-        createdAt: lastReadMessageCreatedAt,
         chatRoom: { id: chatRoomId },
+        createdAt: lastReadMessageCreatedAt,
       };
 
       // 채팅방에 있는 모든 참여자에게 (채팅방 내부) 읽음 표시 broadcast
-      this.server
-        .to(`chatRoom_${chatRoomId.toString()}`)
-        .emit('chat:room:read:update', { lastReadMessage, readBy: decoded.id });
+      this.server.to(`chatRoom_${chatRoomId}`).emit('chat:room:read:update', {
+        chatRoomId,
+        lastReadMessage,
+        readBy: decoded.id,
+      });
 
       // 해당 유저에세 개인적 (채팅방 외부)
       this.server

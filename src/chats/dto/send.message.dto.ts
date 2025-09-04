@@ -1,15 +1,24 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsString } from 'class-validator';
+import { IsArray, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class SendMessageDto {
-  @IsNumber()
-  chatRoomId: number;
+  @IsOptional()
+  @IsString()
+  tempChatRoomId: string;
 
+  @IsOptional()
+  @IsNumber()
+  chatRoomId?: number;
+
+  @IsOptional()
   @IsArray()
   @IsNumber({}, { each: true })
   @Type(() => Number)
   opponentIds?: number[];
 
   @IsString()
-  message: string;
+  tempMessageId: string;
+
+  @IsString()
+  content: string;
 }

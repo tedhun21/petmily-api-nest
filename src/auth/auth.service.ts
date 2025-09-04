@@ -47,31 +47,29 @@ export class AuthService {
 
     // ── 2. 토큰 생성 및 저장 ───────────────────────────
     const payload = { id: user.id, role: user.role };
-    const refresh_token = await this.loginWithUser(payload);
+    const refresh_token = await this.issueRefreshToken(payload);
 
     return refresh_token;
   }
 
   // OAuth 로그인
   async signInWithOAuth(payload: { id: number; role: UserRole }) {
-    const refresh_token = await this.loginWithUser(payload);
+    const refresh_token = await this.issueRefreshToken(payload);
 
     return refresh_token;
   }
 
-  // 공통 로그인 처리 - 토큰 발행, 리프레시 토큰
-  async loginWithUser(payload: { id: number; role: UserRole }) {
+  // 공통 로그인 처리 - 토큰 발행, 리프레시 토큰 설정
+  async issueRefreshToken(payload: { id: number; role: UserRole }) {
     const refresh_token = await this.generateToken(payload, 'refresh');
-
-    if (!this.redisService.getClient()) {
-      throw new ServiceUnavailableException('Redis is not connected');
-    }
 
     await this.redisAuthService.saveRefreshToken(payload.id, refresh_token);
 
     return refresh_token;
   }
 
+  // 리프레시 토큰 기준으로
+  // 새로운 액세스 + 리프레시 토큰 발급
   async refreshToken({ refreshToken }: RefreshTokenDto) {
     // ── 1. JWT 유효성 검사 (서명·만료 확인) ───────────────────────
     let decoded: { id: number; role: UserRole; exp?: number; iat?: number };
@@ -97,7 +95,7 @@ export class AuthService {
 
     // ── 4. Redis 토큰 일치 확인 ─────────────────────────────────
     const stored = await this.redisAuthService.getRefreshToken(decoded.id);
-    console.log('Stored refresh token:', stored);
+
     if (!stored || stored !== refreshToken) {
       await this.redisAuthService.deleteRefreshToken(decoded.id);
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -116,13 +114,9 @@ export class AuthService {
     return { access_token, refresh_token: newRefreshToken };
   }
 
-  // async validateEmailCode(emailCodeInput) {
-  //   const { code } = emailCodeInput;
-  // }
-
   async logout(refreshToken: string): Promise<void> {
     try {
-      const payload = this.jwtService.decode(refreshToken) as { id: number };
+      const payload = this.jwtService.decode(refreshToken);
       if (payload && payload.id) {
         await this.redisAuthService.deleteRefreshToken(payload.id);
       }

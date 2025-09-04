@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { getLocations } from 'src/common/location/location.utils';
@@ -7,6 +7,7 @@ import { FindLocationCountDto } from './dto/find.location-count.dto';
 import { RedisLocationService } from 'src/redis/location/redis-location.service';
 @Injectable()
 export class SearchService implements OnModuleInit {
+  private readonly logger = new Logger(SearchService.name);
   constructor(
     private readonly elasticsearchService: ElasticsearchService,
     private readonly redisLocationService: RedisLocationService,
@@ -15,12 +16,12 @@ export class SearchService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.elasticsearchService.ping();
-      console.log('ELASTICSEARCH: ✅ Elasticsearch is connected');
+      this.logger.log('ELASTICSEARCH: ✅ Elasticsearch is connected');
 
       await this.createIndex('locations');
       await this.seedLocations();
     } catch (error) {
-      console.error(
+      this.logger.error(
         'ELASTICSEARCH: ❌ Elasticsearch connection failed:',
         error,
       );
@@ -124,14 +125,16 @@ export class SearchService implements OnModuleInit {
           },
         });
 
-        console.log(
+        this.logger.log(
           `ELASTICSEARCH: ✅ Index "${indexName}" created with n-gram settings`,
         );
       } else {
-        console.log(`ELASTICSEARCH: ℹ️ Index "${indexName}" already exists`);
+        this.logger.log(
+          `ELASTICSEARCH: ℹ️ Index "${indexName}" already exists`,
+        );
       }
     } catch (error) {
-      console.error(`❌ Failed to create index "${indexName}":`, error);
+      this.logger.error(`❌ Failed to create index "${indexName}":`, error);
     }
   }
 

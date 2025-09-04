@@ -6,7 +6,7 @@ import { Message } from './message.entity';
 
 @Entity()
 export class ChatMember extends CoreEntity {
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
 

@@ -3,57 +3,48 @@ import { RedisService } from '../redis.service';
 
 @Injectable()
 export class RedisChatService {
-  private readonly TTL_SECONDS = 60 * 30; // 30분
-
   constructor(private readonly redisService: RedisService) {}
 
   // Redis Key: unread_message_count:{userId}
   // Redis Hash Field: {chatRoomId}
-  // Redis Hash Value:unreadCount (type string)
+  // Redis Hash Value: unreadCount (type string)
 
-  async incremetOrInitUnreadCount(
-    userId: number,
-    chatRoomId: number,
-    initialValue: number = 1,
-  ) {
+  /**
+   * 특정 채팅방의 안 읽은 메시지 카운트를 1 증가시킵니다.
+   * hincrby 명령어는 필드가 없으면 0으로 시작하므로, 초기화와 증가가 한번에 처리됩니다.
+   */
+  async incrementUnreadCount(userId: number, chatRoomId: number) {
     const redisClient = this.redisService.getClient();
     if (!redisClient) return;
 
     const hashKey = `unread_message_count:${userId}`;
     const field = chatRoomId.toString();
 
-    const exists = await this.hasUnreadCount(userId, chatRoomId);
-
-    if (exists) {
-      await redisClient.hincrby(hashKey, field, 1);
-    } else {
-      await redisClient.hset(hashKey, field, initialValue.toString());
-    }
-
-    await redisClient.expire(hashKey, this.TTL_SECONDS);
+    await redisClient.hincrby(hashKey, field, 1);
   }
 
+  /**
+   * 특정 채팅방의 안 읽은 메시지 카운트를 특정 값으로 설정합니다.
+   * count가 0이면 필드를 삭제하여 메모리를 절약합니다.
+   */
   async setUnreadCount(userId: number, chatRoomId: number, count: number) {
     const redisClient = this.redisService.getClient();
-
     if (!redisClient) return;
-    if (count === 0) {
-      await this.clearUnreadCount(userId, chatRoomId);
-      return;
-    }
 
     const hashKey = `unread_message_count:${userId}`;
     const field = chatRoomId.toString();
 
-    await redisClient.hset(hashKey, field, count.toString());
-
-    await redisClient.expire(hashKey, this.TTL_SECONDS);
+    if (count === 0) {
+      await redisClient.hdel(hashKey, field);
+    } else {
+      await redisClient.hset(hashKey, field, count.toString());
+    }
   }
 
   // 특정 채팅방의 유저의 안 읽은 카운트 조회
   async getUnreadCount(userId: number, chatRoomId: number) {
     const redisClient = this.redisService.getClient();
-    if (!redisClient) return;
+    if (!redisClient) return 0; // 0을 반환하도록 수정
 
     const hashKey = `unread_message_count:${userId}`;
     const field = chatRoomId.toString();
@@ -82,35 +73,12 @@ export class RedisChatService {
   // 사용자의 총 안 읽은 메시지 수 계산
   async getTotalUnreadCount(userId: number): Promise<number> {
     const redisClient = this.redisService.getClient();
-    if (!redisClient) return;
+    if (!redisClient) return 0;
 
     const counts = await this.getAllUnreadCounts(userId);
     return (Object.values(counts) as number[]).reduce(
       (total, count) => total + count,
       0,
     );
-  }
-
-  // unreadCount 캐시 삭제
-  async clearUnreadCount(userId: number, chatRoomId: number) {
-    const redisClient = this.redisService.getClient();
-    if (!redisClient) return;
-
-    const hashKey = `unread_message_count:${userId}`;
-    const field = chatRoomId.toString();
-
-    await redisClient.hdel(hashKey, field);
-  }
-
-  // 해당 필드가 존재하는지
-  async hasUnreadCount(userId: number, chatRoomId: number): Promise<boolean> {
-    const redisClient = this.redisService.getClient();
-    if (!redisClient) return;
-
-    const hashKey = `unread_message_count:${userId}`;
-    const field = chatRoomId.toString();
-
-    const exists = await redisClient.hexists(hashKey, field); // hexists - 필드가 존재하면 1, 존재하지 않으면 0
-    return exists === 1;
   }
 }
