@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Socket } from 'socket.io';
 
@@ -6,19 +11,20 @@ import { Socket } from 'socket.io';
 export class WsJwtGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
 
-  async canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const client: Socket = context.switchToWs().getClient();
     const token = client.handshake.auth?.access_token;
 
-    try {
-      const decoded = await this.jwtService.verifyAsync(token);
-      client.data.user = decoded;
-      return true;
-    } catch (e) {
-      if (e.name === 'TokenExpiredError') {
-        client.emit('auth:expired', { message: 'Token expired' });
-      }
-      return false;
+    if (!token) {
+      throw new UnauthorizedException('No token provided');
     }
+
+    try {
+      const payload = await this.jwtService.verifyAsync(token);
+      client.data.user = payload;
+    } catch {
+      throw new UnauthorizedException('Token is invalid or expired');
+    }
+    return true;
   }
 }

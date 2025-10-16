@@ -1,4 +1,3 @@
-import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
@@ -32,7 +31,6 @@ export class FindPossiblePetsittersDto extends PaginationDto {
   location?: string;
 
   @IsOptional()
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   @IsArray()
   @IsEnum(PetSpecies, { each: true })
   petSpecies?: PetSpecies[];

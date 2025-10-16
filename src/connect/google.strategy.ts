@@ -39,7 +39,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
           nickname: username,
           provider: Provider.GOOGLE,
           verified: true,
-          role: UserRole.USER,
+          role: UserRole.COMMON,
         });
 
         done(null, newUser);

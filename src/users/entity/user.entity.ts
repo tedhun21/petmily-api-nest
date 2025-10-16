@@ -1,22 +1,13 @@
-import { InternalServerErrorException } from '@nestjs/common';
 import { CoreEntity } from 'src/common/entity/core.entity';
-import {
-  BeforeInsert,
-  BeforeUpdate,
-  Column,
-  Entity,
-  JoinTable,
-  ManyToMany,
-  OneToMany,
-} from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import { Column, Entity, JoinTable, ManyToMany, OneToMany } from 'typeorm';
 import { Pet, PetSpecies } from 'src/pets/entity/pet.entity';
 import { ChatMember } from 'src/chats/entity/chatMember.entity';
 import { Notification } from 'src/notifications/entity/notification.entity';
 import { NotificationRead } from 'src/notifications/entity/notification_read.entity';
+import { Exclude, Expose } from 'class-transformer';
 
 export enum UserRole {
-  USER = 'user',
+  COMMON = 'common',
   CLIENT = 'client',
   PETSITTER = 'petsitter',
 }
@@ -37,71 +28,91 @@ export enum DayOfWeek {
 }
 
 @Entity()
+@Exclude() // 모든 필드 노출 X
 export class User extends CoreEntity {
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @Column()
   username: string;
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @Column({ nullable: true })
   nickname?: string;
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @Column()
   email: string;
 
   @Column({ nullable: true })
   password?: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.COMMON })
   role: UserRole;
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @Column({ default: false })
   verified: boolean;
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @Column({ nullable: true })
   zipcode: string;
 
+  @Expose({ groups: ['client'] })
   @Column({ nullable: true })
   address?: string;
 
+  @Expose({ groups: ['client'] })
   @Column({ nullable: true })
   detailAddress?: string;
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @Column({ nullable: true })
   phone?: string;
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @Column({ nullable: true })
   photo?: string;
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @Column({ nullable: true })
   body?: string;
 
+  @Expose({ groups: ['petsitter'] })
   @Column({ default: 0, nullable: true })
   star?: number;
 
+  @Expose({ groups: ['petsitter'] })
   @Column({ default: 0, nullable: true })
   reviewCount?: number;
 
+  @Expose({ groups: ['petsitter'] })
   @Column({ default: 0, nullable: true })
   completedReservationsCount?: number;
 
   @Column({ type: 'enum', enum: Provider })
   provider?: Provider;
 
+  @Expose({ groups: ['petsitter'] })
   @Column('enum', { array: true, enum: PetSpecies, nullable: true })
   possiblePetSpecies?: PetSpecies[];
 
+  @Expose({ groups: ['petsitter'] })
   @Column('enum', { array: true, enum: DayOfWeek, nullable: true })
   possibleDays: DayOfWeek[];
 
+  @Expose({ groups: ['petsitter'] })
   @Column('text', { array: true, nullable: true })
   possibleLocations: string[];
 
+  @Expose({ groups: ['petsitter'] })
   @Column({ type: 'time', nullable: true })
   possibleStartTime: string;
 
+  @Expose({ groups: ['petsitter'] })
   @Column({ type: 'time', nullable: true })
   possibleEndTime: string;
 
-  // 가지고 있는 펫 (for client)
+  @Expose({ groups: ['client'] })
   @OneToMany(() => Pet, (pet) => pet.owner)
   pets: Pet[];
 
@@ -113,47 +124,18 @@ export class User extends CoreEntity {
   })
   favorites: User[];
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @OneToMany(() => ChatMember, (chatMember) => chatMember.user)
   chatMembers: ChatMember[];
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @ManyToMany(() => Notification, (notification) => notification.receivers)
   receivedNotifications: Notification[];
 
+  @Expose({ groups: ['common', 'client', 'petsitter'] })
   @OneToMany(
     () => NotificationRead,
     (notificationRead) => notificationRead.user,
   )
   notificationReads: NotificationRead[];
-
-  @BeforeInsert()
-  @BeforeUpdate()
-  async hashPassword(): Promise<void> {
-    // 만약 엔티티가 업데이트 되면서 훅이 작동하여 비밀번호를 다시 해시화하게 되면 비밀번호가 이중으로 해시화된다
-    if (
-      this.password &&
-      !this.password.startsWith('$2b$') // password값이 실제로 변경될 때만 해시화가 실행되도록 // bcrypt는 보통 해시된 값이 "$2b$"로 시작하므로
-    ) {
-      try {
-        this.password = await bcrypt.hash(this.password, 10);
-      } catch (e) {
-        console.error('Error hashing password:', e);
-        throw new InternalServerErrorException('Error hashing password');
-      }
-    }
-  }
-
-  async checkPassword(aPassword: string): Promise<boolean> {
-    try {
-      if (!aPassword || !this.password) {
-        console.error('Missing password or hash');
-        throw new InternalServerErrorException('Missing password or hash');
-      }
-
-      const isMatch = await bcrypt.compare(aPassword, this.password);
-      return isMatch;
-    } catch (e) {
-      console.error('Error comparing password:', e);
-      throw new InternalServerErrorException('Password comparison error');
-    }
-  }
 }

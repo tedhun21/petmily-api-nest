@@ -1,10 +1,10 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Param,
+  ParseArrayPipe,
   Post,
   Put,
   Query,
@@ -23,8 +23,7 @@ import { FindPossiblePetsittersDto } from './dto/find.petsitterPossible.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UpdateFavoriteDto } from './dto/updateFavorite.user';
 import { FindUserByEmailOrNicknameDto } from './dto/find.petsitterByNickname.dto';
-import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
+import { ParseJsonPipe } from 'src/common/pipe/parse-json.pipe';
 
 @Controller('users')
 export class UsersController {
@@ -40,10 +39,11 @@ export class UsersController {
   }
 
   @Get('by-ids')
-  findByIds(@Query('ids') ids: string) {
-    const arrayIds = ids.split(',').map((id) => Number(id));
-
-    return this.usersService.findByIds(arrayIds);
+  findByIds(
+    @Query('ids', new ParseArrayPipe({ items: Number, separator: ',' }))
+    ids: number[],
+  ) {
+    return this.usersService.findByIds(ids);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -73,24 +73,10 @@ export class UsersController {
   async update(
     @Param() paramDto: ParamDto,
     @AuthUser() jwtUser: JwtUser,
-    @Body('data') updateUserDto: string,
+    @Body('data', new ParseJsonPipe()) updateUserDto: UpdateUserDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const dto = plainToInstance(UpdateUserDto, JSON.parse(updateUserDto));
-    const errors = await validate(dto);
-
-    if (errors.length > 0) {
-      const formattedErrors = errors.map((err) => ({
-        property: err.property,
-        constraints: err.constraints,
-      }));
-      throw new BadRequestException({
-        message: 'Validation failed',
-        errors: formattedErrors,
-      });
-    }
-
-    return this.usersService.update(paramDto, jwtUser, dto, file);
+    return this.usersService.update(paramDto, jwtUser, updateUserDto, file);
   }
 
   @UseGuards(JwtAuthGuard)

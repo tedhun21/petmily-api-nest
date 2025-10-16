@@ -25,6 +25,8 @@ import { RedisLocationService } from 'src/redis/location/redis-location.service'
 import { RedisService } from 'src/redis/redis.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { instanceToPlain } from 'class-transformer';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -40,35 +42,36 @@ export class UsersService {
   ) {}
 
   async create(createUserDto: CreateUserDto) {
-    const { email, nickname } = createUserDto;
+    const { email, nickname, password } = createUserDto;
 
-    const existingEmail = await this.usersRepository.findOne({
-      where: { email },
+    const existingUser = await this.usersRepository.findOne({
+      where: [{ email }, { nickname }],
     });
 
-    if (existingEmail) {
-      throw new ConflictException({
-        statusCode: 409,
-        field: 'email',
-        message: 'This email is already registered',
-        error: 'email_conflict', // 타입 추가
-      });
-    }
-
-    const existingNickname = await this.usersRepository.findOne({
-      where: { nickname },
-    });
-
-    if (existingNickname) {
-      throw new ConflictException({
-        statusCode: 409,
-        field: 'nickname',
-        message: 'This nickname is already registered',
-        error: 'nickname_conflict', // 타입 추가
-      });
+    if (existingUser) {
+      if (existingUser.email === email) {
+        throw new ConflictException({
+          statusCode: 409,
+          field: 'email',
+          message: 'This email is already registered',
+          error: 'email_conflict',
+        });
+      }
+      if (existingUser.nickname === nickname) {
+        throw new ConflictException({
+          statusCode: 409,
+          field: 'nickname',
+          message: 'This nickname is already registered',
+          error: 'nickname_conflict',
+        });
+      }
     }
 
     const user = this.usersRepository.create(createUserDto);
+
+    if (password) {
+      user.password = await bcrypt.hash(password, 10);
+    }
 
     try {
       const newUser = await this.usersRepository.save(user);
@@ -97,86 +100,34 @@ export class UsersService {
     findUserByEmailOrNicknameDto: FindUserByEmailOrNicknameDto,
   ) {
     const { q } = findUserByEmailOrNicknameDto;
-    // 모든 필드를 가져오되, 역할에 따라 나중에 필드를 필터링
+
     const user = await this.usersRepository.findOne({
       where: q.includes('@') ? { email: q } : { nickname: q },
-      select: {
-        id: true,
-        email: true,
-        nickname: true,
-        role: true,
-        photo: true,
-        pets: true, // 클라이언트만 사용하는 필드들
-        star: true, // 펫시터만 사용하는 필드들
-        reviewCount: true,
-        possibleDays: true,
-        possibleLocations: true,
-        possiblePetSpecies: true,
-        possibleStartTime: true,
-        possibleEndTime: true,
-        favorites: true,
-        // 기타 공통 필드들
-      },
     });
 
-    // 역할에 따라 필터링
-    if (user.role === UserRole.CLIENT) {
-      // 클라이언트일 경우 펫시터 전용 필드를 제거
-      delete user.star;
-      delete user.reviewCount;
-      delete user.possibleDays;
-      delete user.possibleLocations;
-      delete user.possiblePetSpecies;
-      delete user.possibleStartTime;
-      delete user.possibleEndTime;
-    } else if (user.role === UserRole.PETSITTER) {
-      // 펫시터일 경우 펫시터 전용 필드를 제거
-      delete user.pets;
+    if (!user) {
+      throw new NotFoundException('No user found');
     }
 
-    return user;
+    return instanceToPlain(user, {
+      groups: [user.role.toLowerCase(), 'common'],
+    });
   }
 
   async me(jwtUser: JwtUser) {
-    const { id: userId, role } = jwtUser;
-
-    let conditionalSelect: any = {
-      id: true,
-      username: true,
-      nickname: true,
-      email: true,
-      verified: true,
-      role: true,
-      address: true,
-      detailAddress: true,
-      photo: true,
-      provider: true,
-      pets: true,
-    };
-
-    if (role === UserRole.PETSITTER) {
-      conditionalSelect = {
-        ...conditionalSelect,
-        possibleDays: true,
-        possiblePetSpecies: true,
-        possibleStartTime: true,
-        possibleEndTime: true,
-        possibleLocations: true,
-      };
-
-      delete conditionalSelect.pets;
-    }
+    const { id: userId } = jwtUser;
 
     const me = await this.usersRepository.findOne({
       where: { id: userId },
-      select: conditionalSelect,
     });
 
     if (!me) {
       throw new NotFoundException('No user found');
     }
 
-    return me;
+    return instanceToPlain(me, {
+      groups: [me.role.toLowerCase(), 'common'],
+    });
   }
 
   async update(
@@ -237,7 +188,7 @@ export class UsersService {
     }
 
     if (password) {
-      user.password = password;
+      user.password = await bcrypt.hash(password, 10);
     }
 
     const updateUserData = {
@@ -289,39 +240,42 @@ export class UsersService {
     // 1. 클라이언트 유저를 찾음
     const user = await this.usersRepository.findOne({
       where: { id: userId },
+      relations: ['favorites'],
+      select: { favorites: { id: true } },
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    try {
-      // 2. 페이징을 사용해 클라이언트의 좋아요 목록에서 펫시터 가져오기
-      const [favorites, total] = await this.usersRepository
-        .createQueryBuilder('user')
-        .leftJoinAndSelect('user.favorites', 'petsitter') // Join the favorites relation
-        .where('user.id = :userId', { userId })
-        .skip((+page - 1) * +pageSize) // Apply pagination skip
-        .take(+pageSize) // Apply pagination limit
-        .getManyAndCount(); // Return the list of petsitters and the total count
-
-      const totalPages = Math.ceil(total / +pageSize);
-      const favoritePetsitters = favorites.flatMap((user) => user.favorites);
-
+    if (!user || user.favorites.length === 0) {
       return {
-        results: favoritePetsitters,
+        results: [],
         pagination: {
-          total,
-          totalPages,
-          page: +page,
-          pageSize: +pageSize,
+          total: 0,
+          totalPages: 0,
+          page: page,
+          pageSize: pageSize,
         },
       };
-    } catch (e) {
-      throw new InternalServerErrorException(
-        'Fail to fetch favorite petsitters',
-      );
     }
+
+    const favoriteIds = user.favorites.map((fav) => fav.id);
+
+    // 2. 페이징을 사용해 클라이언트의 좋아요 목록에서 펫시터 가져오기
+    const [petsitters, total] = await this.usersRepository.findAndCount({
+      where: { id: In(favoriteIds) },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    const totalPages = Math.ceil(total / pageSize);
+
+    return {
+      results: petsitters,
+      pagination: {
+        total,
+        totalPages,
+        page: page,
+        pageSize: pageSize,
+      },
+    };
   }
 
   async findPossiblePetsitters(
@@ -333,14 +287,12 @@ export class UsersService {
     // 동적 조건
     const queryBuilder = this.usersRepository
       .createQueryBuilder('user')
-      .where('user.role = :role', { role: 'Petsitter' });
+      .where('user.role = :role', { role: UserRole.PETSITTER });
 
     if (location) {
-      // 요소 부분 일치
-      queryBuilder.andWhere(
-        "ARRAY_TO_STRING(user.possibleLocations, ',') ILIKE :location",
-        { location: `%${location}%` },
-      );
+      queryBuilder.andWhere(':location = ANY(user.possibleLocations)', {
+        location,
+      });
 
       // Redis 위치 검색 카운트 증가 (안전 처리)
       if (isValidLocation(location)) {
@@ -375,30 +327,19 @@ export class UsersService {
     }
 
     const [petsitters, total] = await queryBuilder
-      .select([
-        'user.id',
-        'user.nickname',
-        'user.photo',
-        'user.role',
-        'user.address',
-        'user.body',
-        'user.possibleDays',
-        'user.possibleLocations',
-        'user.possiblePetSpecies',
-        'user.possibleStartTime',
-        'user.possibleEndTime',
-        'user.reviewCount',
-        'user.star',
-      ])
-      .take(+pageSize)
-      .skip((+page - 1) & +pageSize)
+      .take(pageSize)
+      .skip((page - 1) * pageSize)
       .getManyAndCount();
 
-    const totalPages = Math.ceil(total / +pageSize);
+    const totalPages = Math.ceil(total / pageSize);
+
+    const results = petsitters.map((petsitter) =>
+      instanceToPlain(petsitter, { groups: ['common', 'petsitter'] }),
+    );
 
     return {
-      results: petsitters,
-      pagination: { total, totalPages, page: +page, pageSize: +pageSize },
+      results,
+      pagination: { total, totalPages, page: page, pageSize: pageSize },
     };
   }
 
@@ -436,8 +377,8 @@ export class UsersService {
           });
         }),
       )
-      .skip((+page - 1) * +pageSize)
-      .take(+pageSize)
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
       .select([
         'user.id',
         'user.nickname',
@@ -454,11 +395,11 @@ export class UsersService {
 
     const [petsitters, total] = await query.getManyAndCount();
 
-    const totalPages = Math.ceil(total / +pageSize);
+    const totalPages = Math.ceil(total / pageSize);
 
     return {
       results: petsitters,
-      pagination: { total, totalPages, page: +page, pageSize: +pageSize },
+      pagination: { total, totalPages, page: page, pageSize: pageSize },
     };
   }
 
@@ -480,21 +421,19 @@ export class UsersService {
     const { id: userId } = jwtUser;
     const { opponentId, action } = updateFavoriteDto;
 
-    // 현재 사용자 가져오기 (favorites)
-    const me = await this.usersRepository.findOne({
-      where: { id: userId },
-      relations: ['favorites'],
-      select: {
-        id: true,
-        favorites: { id: true },
-      },
-    });
+    const [me, opponentExists] = await Promise.all([
+      this.usersRepository.findOne({
+        where: { id: userId },
+        relations: ['favorites'],
+        select: {
+          id: true,
+          favorites: { id: true },
+        },
+      }),
+      this.usersRepository.count({ where: { id: opponentId } }),
+    ]);
 
-    // 상대방 유저 존재 여부 확인 (count() 사용)
-    const userExists = await this.usersRepository.count({
-      where: { id: opponentId },
-    });
-    if (userExists === 0) {
+    if (opponentExists === 0) {
       throw new NotFoundException('User not found');
     }
 
@@ -519,7 +458,7 @@ export class UsersService {
     manager: EntityManager,
     isNewReview: boolean,
   ) {
-    const petsitter = await this.usersRepository.findOne({
+    const petsitter = await manager.findOne(User, {
       where: { id: petsitterId },
     });
 
@@ -557,7 +496,7 @@ export class UsersService {
   }
 
   async updatePetsitterCompleted(petsitterId: number, manager: EntityManager) {
-    const petsitter = await this.usersRepository.findOne({
+    const petsitter = await manager.findOne(User, {
       where: { id: petsitterId },
     });
 
@@ -605,11 +544,11 @@ export class UsersService {
   async validateUserByEmailAndPassword(email: string, password: string) {
     const user = await this.findUserByEmail(email);
 
-    if (!user) {
+    if (!user || !user.password) {
       throw new NotFoundException('No user found');
     }
 
-    const ok = await user.checkPassword(password);
+    const ok = await bcrypt.compare(password, user.password);
 
     if (ok) {
       return user;

@@ -133,7 +133,7 @@ export class AuthService {
       type === 'access' ? 'JWT_ACCESS_SECRET' : 'JWT_REFRESH_SECRET',
     );
 
-    const expiresIn = type === 'access' ? '1m' : '7d';
+    const expiresIn = type === 'access' ? '15m' : '7d';
 
     return this.jwtService.signAsync(payload, { secret, expiresIn });
   }

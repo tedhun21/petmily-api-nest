@@ -10,8 +10,9 @@ import { Server, Socket } from 'socket.io';
 import { ChatsService } from './chats.service';
 import { SendMessageDto } from './dto/send.message.dto';
 import { ReadMessageDto } from './dto/read.message.dto';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import { WsJwtGuard } from 'src/common/guard/WsJwtGuard';
+import { WsExceptionFilter } from 'src/common/filter/ws-exception.filter';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class ChatsGateWay {
@@ -43,31 +44,30 @@ export class ChatsGateWay {
     @ConnectedSocket() client: Socket,
     @MessageBody() data,
   ) {
-    const { id: userId } = client.data.user;
+    const { user } = client.data;
     const { chatRoomId } = data;
 
     try {
       client.join(`chatRoom_${chatRoomId}`);
-      this.logger.log(`User ${userId} joined chatRoom_${chatRoomId}`);
+      this.logger.log(`User ${user.id} joined chatRoom_${chatRoomId}`);
     } catch (e) {
       this.logger.error('Invalid token for chat:room:join:', e);
     }
   }
 
+  @UseGuards(WsJwtGuard)
+  @UseFilters(WsExceptionFilter)
   @SubscribeMessage('chat:message:new')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SendMessageDto,
   ) {
+    const { user } = client.data;
     const { chatRoomId, opponentIds, tempMessageId, content } = data;
-    const { access_token } = client.handshake.auth;
 
     try {
-      // 1. 토큰 검증
-      const decoded = await this.jwtService.verifyAsync(access_token);
-
       // 2. 메시지 생성
-      const newMessage = await this.chatsService.createMessage(decoded, {
+      const newMessage = await this.chatsService.createMessage(user, {
         chatRoomId,
         opponentIds,
         content,
@@ -126,28 +126,21 @@ export class ChatsGateWay {
           tempMessageId,
         };
       }
-    } catch (e) {
-      return {
-        success: false,
-        error: e.name,
-        id: tempMessageId,
-      };
-    }
+    } catch (e) {}
   }
 
+  @UseGuards(WsJwtGuard)
+  @UseFilters(WsExceptionFilter)
   @SubscribeMessage('chat:read:mark')
   async markReadMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ReadMessageDto,
   ) {
-    const { access_token } = client.handshake.auth;
-
     const { chatRoomId, lastReadMessageId, lastReadMessageCreatedAt } = data;
+    const { user } = client.data;
 
     try {
-      const decoded = await this.jwtService.verifyAsync(access_token);
-
-      await this.chatsService.markMessagesAsRead(decoded, chatRoomId, {
+      await this.chatsService.markMessagesAsRead(user, chatRoomId, {
         lastReadMessageId,
         lastReadMessageCreatedAt,
       });
@@ -162,16 +155,14 @@ export class ChatsGateWay {
       this.server.to(`chatRoom_${chatRoomId}`).emit('chat:room:read:update', {
         chatRoomId,
         lastReadMessage,
-        readBy: decoded.id,
+        readBy: user.id,
       });
 
       // 해당 유저에세 개인적 (채팅방 외부)
-      this.server
-        .to(`chatUser_${decoded.id}`)
-        .emit('chat:user:newMessage:clear', {
-          lastReadMessage,
-          readBy: decoded.id,
-        });
+      this.server.to(`chatUser_${user.id}`).emit('chat:user:newMessage:clear', {
+        lastReadMessage,
+        readBy: user.id,
+      });
     } catch (e) {}
   }
 }
